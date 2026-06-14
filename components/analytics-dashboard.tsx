@@ -60,14 +60,36 @@ export function AnalyticsDashboard({
 }: AnalyticsDashboardProps) {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
 
   useEffect(() => {
-    fetch(`/api/analytics/${documentId}`)
-      .then((res) => res.json())
-      .then((result) => {
-        setData(result);
-        setLoading(false);
-      });
+    let cancelled = false;
+
+    async function loadData() {
+      try {
+        const res = await fetch(`/api/analytics/${documentId}`);
+        if (!res.ok) throw new Error("Failed to load analytics");
+        const result = await res.json();
+        if (!cancelled) {
+          setData(result);
+          setLastUpdatedAt(new Date());
+        }
+      } catch {
+        // Silent fail on auto-refresh; keep existing data.
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadData();
+    const interval = setInterval(loadData, 5000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [documentId]);
 
   if (loading) {
@@ -95,9 +117,20 @@ export function AnalyticsDashboard({
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-semibold">{filename}</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-semibold">{filename}</h2>
+            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-600" />
+              Live
+            </span>
+          </div>
           <p className="text-muted-foreground">
             Document analytics and viewer activity
+            {lastUpdatedAt && (
+              <span className="ml-2 text-xs">
+                Updated {lastUpdatedAt.toLocaleTimeString()}
+              </span>
+            )}
           </p>
         </div>
         <Button variant="outline" asChild>

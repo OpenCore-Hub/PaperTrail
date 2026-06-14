@@ -108,6 +108,7 @@ model ShareLink {
   sessions        ViewSession[]
   viewerGrants    ViewerGrant[]
 
+  @@index([documentId])
   @@map("share_links")
 }
 
@@ -123,6 +124,11 @@ model ViewSession {
   link              ShareLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
   pageViews         PageView[]
 
+  @@index([linkId])
+  @@index([startedAt])
+  @@index([fingerprint])
+  @@index([viewerEmail])
+  @@index([linkId, startedAt])
   @@map("view_sessions")
 }
 
@@ -147,5 +153,7 @@ model PageView {
 
   session         ViewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
+  @@index([sessionId])
+  @@index([pageNumber])
   @@map("page_views")
 }

@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Password reset flow (forgot/reset API routes and pages).
 - Rate limiting and input validation for public viewer endpoints.
 - Redis-backed rate limiter with in-memory fallback for single-instance deployments.
+- Database indexes on analytics-related tables (`share_links`, `view_sessions`, `page_views`).
+- Real-time analytics dashboard with 5-second auto-refresh and live indicator.
+- Visibility-aware viewer heartbeat to avoid inflating duration when the tab is hidden.
+- Centralized analytics aggregation helper (`lib/analytics.ts`) with unit tests.
 - Health check endpoint (`/api/health`) with database and UploadThing checks.
 - Production `Dockerfile` and `docker-compose.prod.yml` with PostgreSQL, Redis, and app services.
 - Security response headers including CSP, HSTS, X-Frame-Options, and Referrer-Policy.
