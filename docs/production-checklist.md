@@ -36,6 +36,10 @@ CUSTOM_DOMAIN_CNAME_TARGET=your-domain.com  # 或 A 记录目标 IP
 
 # Cron 清理任务密钥
 CRON_SECRET=                # 随机字符串，外部 cron 调用时放在 Authorization: Bearer <token>
+
+# Sentry 错误追踪（可选但强烈建议）
+NEXT_PUBLIC_SENTRY_DSN=https://xxx@yyy.ingest.sentry.io/zzz
+NEXT_PUBLIC_SENTRY_ENVIRONMENT=production
 ```
 
 ## 2. 首次部署步骤
@@ -121,3 +125,25 @@ curl https://your-domain.com/api/health
 - 接入 Sentry 或 Logrocket 捕获前端/后端错误。
 - 对 `/api/health` 做 uptime 监控。
 - 对 PostgreSQL 和 Redis 做资源告警。
+
+## 9. Sentry 错误追踪
+
+1. 在 [sentry.io](https://sentry.io) 创建 Next.js 项目。
+2. 复制 DSN 到 `NEXT_PUBLIC_SENTRY_DSN`。
+3. 重新构建部署。只有配置 DSN 后，Sentry webpack 插件才会启用。
+4. （可选）配置 source map 上传：设置 `SENTRY_AUTH_TOKEN`、`SENTRY_ORG`、`SENTRY_PROJECT`。
+
+## 10. E2E 回归测试
+
+本地运行（需要可用的 PostgreSQL）：
+
+```bash
+# 1. 确保 DATABASE_URL 指向一个可写入的测试数据库
+# 2. 安装浏览器（首次）
+npx playwright install --with-deps chromium
+
+# 3. 运行测试（会自动启动 dev server）
+npx playwright test
+```
+
+CI 中已集成 Playwright，见 `.github/workflows/ci.yml` 的 `e2e` job。
