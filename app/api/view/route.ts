@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
     if (parsed.action === "start") {
       const rateLimitKey = `view:start:${clientIp}`;
-      if (!isAllowed(rateLimitKey, START_RATE_LIMIT)) {
+      if (!(await isAllowed(rateLimitKey, START_RATE_LIMIT))) {
         return NextResponse.json(
           { error: "Rate limit exceeded" },
           { status: 429 },
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
 
     if (parsed.action === "heartbeat") {
       const key = `view:action:${parsed.sessionId}`;
-      if (!isAllowed(key, ACTION_RATE_LIMIT)) {
+      if (!(await isAllowed(key, ACTION_RATE_LIMIT))) {
         return NextResponse.json(
           { error: "Rate limit exceeded" },
           { status: 429 },
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
 
     if (parsed.action === "end") {
       const key = `view:action:${parsed.sessionId}`;
-      if (!isAllowed(key, ACTION_RATE_LIMIT)) {
+      if (!(await isAllowed(key, ACTION_RATE_LIMIT))) {
         return NextResponse.json(
           { error: "Rate limit exceeded" },
           { status: 429 },
@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
 
     if (parsed.action === "page") {
       const key = `view:action:${parsed.sessionId}`;
-      if (!isAllowed(key, ACTION_RATE_LIMIT)) {
+      if (!(await isAllowed(key, ACTION_RATE_LIMIT))) {
         return NextResponse.json(
           { error: "Rate limit exceeded" },
           { status: 429 },

@@ -6,31 +6,26 @@ describe("isAllowed", () => {
     resetRateLimits();
   });
 
-  it("allows requests up to the limit", () => {
+  it("allows requests up to the limit", async () => {
     const window = { maxRequests: 3, windowMs: 60_000 };
-    expect(isAllowed("key", window)).toBe(true);
-    expect(isAllowed("key", window)).toBe(true);
-    expect(isAllowed("key", window)).toBe(true);
-    expect(isAllowed("key", window)).toBe(false);
+    expect(await isAllowed("key", window)).toBe(true);
+    expect(await isAllowed("key", window)).toBe(true);
+    expect(await isAllowed("key", window)).toBe(true);
+    expect(await isAllowed("key", window)).toBe(false);
   });
 
-  it("resets the window after it expires", () => {
+  it("resets the window after it expires", async () => {
     const window = { maxRequests: 1, windowMs: 1 };
-    expect(isAllowed("key", window)).toBe(true);
-    expect(isAllowed("key", window)).toBe(false);
+    expect(await isAllowed("key", window)).toBe(true);
+    expect(await isAllowed("key", window)).toBe(false);
 
-    // Wait for the window to expire.
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        expect(isAllowed("key", window)).toBe(true);
-        resolve(undefined);
-      }, 10);
-    });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(await isAllowed("key", window)).toBe(true);
   });
 
-  it("tracks different keys independently", () => {
+  it("tracks different keys independently", async () => {
     const window = { maxRequests: 1, windowMs: 60_000 };
-    expect(isAllowed("a", window)).toBe(true);
-    expect(isAllowed("b", window)).toBe(true);
+    expect(await isAllowed("a", window)).toBe(true);
+    expect(await isAllowed("b", window)).toBe(true);
   });
 });
