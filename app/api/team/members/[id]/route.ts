@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { UserRole } from "@/lib/roles";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
 const updateSchema = z.object({
-  role: z.enum(["ADMIN", "EDITOR"]),
+  role: z.enum([UserRole.ADMIN, UserRole.EDITOR, UserRole.VIEWER]),
 });
 
 export async function PATCH(

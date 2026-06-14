@@ -49,6 +49,10 @@ LOG_LEVEL=info
 # PDF_CACHE_DIR=/var/cache/dochub/pdf  # 多实例部署需使用共享存储
 # PDF_CACHE_TTL_MS=3600000             # 默认 1 小时
 
+# Prometheus 指标（可选）
+# METRICS_TOKEN=              # 访问 /api/metrics 的 Bearer Token；不设置则公开
+# METRICS_ENABLED=true        # 设置为 false 可禁用指标端点
+
 # 数据库备份
 BACKUP_DIR=./backups                 # 备份存放目录
 BACKUP_RETENTION_DAYS=7              # 本地保留天数
@@ -135,20 +139,51 @@ curl https://your-domain.com/api/health
 - [ ] 使用 HTTPS（Let's Encrypt / 云证书）。
 - [ ] 定期检查 `npm audit` 和依赖更新。
 
-## 8. 监控建议（可选下一步）
+## 8. Prometheus 指标
+
+应用内置 `/api/metrics` 端点，暴露 Prometheus 格式的指标：
+
+- 默认进程指标（GC、内存、事件循环延迟等）。
+- `dochub_api_request_duration_seconds`：按 route/method/status 分桶的 API 请求耗时。
+- `dochub_health_check_total`：健康检查状态统计。
+- `dochub_pdf_cache_total`：PDF 代理缓存命中/未命中/错误统计。
+- `dochub_view_event_total`： viewer 分析事件统计。
+- `dochub_team_invite_total`：团队邀请创建/接受/取消统计。
+
+### 安全配置
+
+- 生产环境建议设置 `METRICS_TOKEN`，并在 Prometheus 配置中携带 `Authorization: Bearer <METRICS_TOKEN>`。
+- 若未设置 `METRICS_TOKEN`，端点将公开访问；请通过反向代理或内网限制访问。
+- 设置 `METRICS_ENABLED=false` 可完全关闭该端点。
+
+### Prometheus 抓取示例
+
+```yaml
+scrape_configs:
+  - job_name: "dochub"
+    static_configs:
+      - targets: ["your-domain.com:3000"]
+    metrics_path: "/api/metrics"
+    authorization:
+      type: Bearer
+      credentials: "<METRICS_TOKEN>"
+```
+
+## 9. 监控建议（可选下一步）
 
 - 接入 Sentry 或 Logrocket 捕获前端/后端错误。
 - 对 `/api/health` 做 uptime 监控。
 - 对 PostgreSQL 和 Redis 做资源告警。
+- 配置 Prometheus Alertmanager 对关键业务指标告警（如 `dochub_pdf_cache_total{outcome="upstream_error"}` 持续增长）。
 
-## 9. Sentry 错误追踪
+## 10. Sentry 错误追踪
 
 1. 在 [sentry.io](https://sentry.io) 创建 Next.js 项目。
 2. 复制 DSN 到 `NEXT_PUBLIC_SENTRY_DSN`。
 3. 重新构建部署。只有配置 DSN 后，Sentry webpack 插件才会启用。
 4. （可选）配置 source map 上传：设置 `SENTRY_AUTH_TOKEN`、`SENTRY_ORG`、`SENTRY_PROJECT`。
 
-## 10. E2E 回归测试
+## 11. E2E 回归测试
 
 本地运行（需要可用的 PostgreSQL）：
 
@@ -163,7 +198,26 @@ npx playwright test
 
 CI 中已集成 Playwright，见 `.github/workflows/ci.yml` 的 `e2e` job。
 
-## 11. 数据库备份与灾难恢复
+## 12. E2E 测试与外部服务
+
+E2E 套件默认运行在 `http://localhost:3000`，使用 `e2e/global-setup.ts` 种子的测试数据。
+
+### UploadThing Token
+
+上传 PDF 的 E2E 需要真实的 `UPLOADTHING_TOKEN`：
+
+- 本地开发：在 `.env.local` 或环境变量中配置真实的 `UPLOADTHING_TOKEN` 后运行 `npx playwright test`。
+- CI：在 GitHub 仓库设置 `UPLOADTHING_TOKEN` secret，工作流已通过 `secrets.UPLOADTHING_TOKEN` 引用。
+- 若未配置 token，上传相关的 E2E 用例会 **skip** 并在报告中明确提示，避免使用占位符假 token 造成误导。
+
+### E2E 清理
+
+`e2e/global-teardown.ts` 会：
+
+1. 删除测试中上传到 UploadThing 的真实文件（通过 `uploadedStorageKeys` 跟踪）。
+2. 删除种子文档、用户、工作区。
+
+## 13. 数据库备份与灾难恢复
 
 1. 确认 `.env.production.local` 中已配置 `DATABASE_URL`、`BACKUP_RETENTION_DAYS`、`BACKUP_SCHEDULE` 和可选的 `S3_BACKUP_BUCKET`。
 2. 确认 `BACKUP_DIR` 已挂载到持久化存储（Docker Compose 中已自动挂载 `./backups`）。

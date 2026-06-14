@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { isAllowed } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/ip";
 import { createLogger } from "@/lib/logger";
+import { viewEventCounter, withMetrics } from "@/lib/metrics";
 import { z } from "zod";
 
 const log = createLogger("api:view");
@@ -36,7 +37,7 @@ const viewActionSchema = z.discriminatedUnion("action", [
   }),
 ]);
 
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
   try {
     const body = await req.json();
     const parsed = viewActionSchema.parse(body);
@@ -79,6 +80,7 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      viewEventCounter.inc({ action: "start" });
       return NextResponse.json({ sessionId: session.id });
     }
 
@@ -96,6 +98,7 @@ export async function POST(req: NextRequest) {
           durationSeconds: { increment: 5 },
         },
       });
+      viewEventCounter.inc({ action: "heartbeat" });
       return NextResponse.json({ ok: true });
     }
 
@@ -111,6 +114,7 @@ export async function POST(req: NextRequest) {
         where: { id: parsed.sessionId },
         data: { endedAt: new Date() },
       });
+      viewEventCounter.inc({ action: "end" });
       return NextResponse.json({ ok: true });
     }
 
@@ -134,6 +138,7 @@ export async function POST(req: NextRequest) {
           pageNumber: parsed.pageNumber,
         },
       });
+      viewEventCounter.inc({ action: "page" });
       return NextResponse.json({ ok: true });
     }
 
@@ -152,3 +157,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export const POST = withMetrics("/api/view", handler);

@@ -46,9 +46,9 @@ function makeRequest(id = "doc-1"): NextRequest {
   }) as NextRequest;
 }
 
-function mockSession() {
+function mockSession(role: "ADMIN" | "EDITOR" | "VIEWER" = "ADMIN") {
   getServerSessionMock.mockResolvedValue({
-    user: { id: "user-1", workspaceId: "ws-1", role: "ADMIN" },
+    user: { id: "user-1", workspaceId: "ws-1", role },
   });
 }
 
@@ -68,6 +68,12 @@ describe("DELETE /api/documents/[id]", () => {
     documentFindFirstMock.mockResolvedValue(null);
     const res = await DELETE(makeRequest(), { params: { id: "doc-1" } });
     expect(res.status).toBe(404);
+  });
+
+  it("rejects VIEWER role", async () => {
+    mockSession("VIEWER");
+    const res = await DELETE(makeRequest(), { params: { id: "doc-1" } });
+    expect(res.status).toBe(401);
   });
 
   it("deletes the document and cleans up storage", async () => {

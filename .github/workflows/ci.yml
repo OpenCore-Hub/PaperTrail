@@ -15,7 +15,6 @@ jobs:
       DATABASE_URL: postgresql://test:test@localhost:5432/test?schema=public
       NEXTAUTH_SECRET: test-secret
       NEXTAUTH_URL: http://localhost:3000
-      UPLOADTHING_TOKEN: test-token
       NEXT_PUBLIC_APP_DOMAIN: localhost
       REDIS_URL: ""
 
@@ -71,7 +70,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dochub_test
       NEXTAUTH_SECRET: test-secret
       NEXTAUTH_URL: http://localhost:3000
-      UPLOADTHING_TOKEN: test-token
+      UPLOADTHING_TOKEN: ${{ secrets.UPLOADTHING_TOKEN }}
       NEXT_PUBLIC_APP_DOMAIN: localhost
       REDIS_URL: ""
       CRON_SECRET: test-cron-secret

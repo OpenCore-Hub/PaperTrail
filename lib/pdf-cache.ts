@@ -54,19 +54,15 @@ export class PdfCache {
     const pdfFile = cacheEntryPath(this.cacheDir, storageKey);
 
     try {
-      const [metaStat, pdfStat] = await Promise.all([
-        fs.stat(metaFile),
-        fs.stat(pdfFile),
-      ]);
+      const pdfStat = await fs.stat(pdfFile);
 
-      const meta: CacheMetadata = JSON.parse(await fs.readFile(metaFile, "utf-8"));
+      const meta: CacheMetadata = JSON.parse(
+        await fs.readFile(metaFile, "utf-8"),
+      );
       const now = Date.now();
       const cachedAt = new Date(meta.cachedAt).getTime();
 
-      if (
-        now - cachedAt > this.ttlMs ||
-        metaStat.mtime.getTime() !== pdfStat.mtime.getTime()
-      ) {
+      if (now - cachedAt > this.ttlMs || pdfStat.size !== meta.size) {
         return null;
       }
 

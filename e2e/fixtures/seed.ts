@@ -23,6 +23,7 @@ export interface SeedState {
   openLinkId: string;
   passwordLinkId: string;
   expiredLinkId: string;
+  uploadedStorageKeys?: string[];
 }
 
 export function writeSeedState(state: SeedState): void {
@@ -31,4 +32,15 @@ export function writeSeedState(state: SeedState): void {
 
 export function readSeedState(): SeedState {
   return JSON.parse(fs.readFileSync(SEED_PATH, "utf-8")) as SeedState;
+}
+
+export function appendUploadedStorageKey(key: string): void {
+  const state = fs.existsSync(SEED_PATH)
+    ? readSeedState()
+    : ({} as Partial<SeedState>);
+  const keys = state.uploadedStorageKeys ?? [];
+  if (!keys.includes(key)) {
+    keys.push(key);
+  }
+  writeSeedState({ ...state, uploadedStorageKeys: keys } as SeedState);
 }

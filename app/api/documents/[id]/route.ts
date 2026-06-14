@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createLogger } from "@/lib/logger";
+import { canManageDocuments, type UserRole } from "@/lib/roles";
 
 const log = createLogger("api:documents");
 
@@ -14,7 +15,10 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.workspaceId) {
+    if (
+      !session?.user?.workspaceId ||
+      !canManageDocuments(session.user.role as UserRole)
+    ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

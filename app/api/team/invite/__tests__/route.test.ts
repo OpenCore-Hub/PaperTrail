@@ -54,13 +54,38 @@ describe("POST /api/team/invite", () => {
     });
   }
 
-  it("rejects non-admin users", async () => {
+  function mockSession(role: "ADMIN" | "EDITOR" | "VIEWER") {
     getServerSessionMock.mockResolvedValue({
-      user: { workspaceId: "ws-1", role: "EDITOR" },
+      user: { workspaceId: "ws-1", role },
     });
+  }
+
+  it("rejects non-admin users", async () => {
+    mockSession("EDITOR");
 
     const res = await POST(makeRequest({ email: "a@b.com", role: "EDITOR" }));
     expect(res.status).toBe(401);
+  });
+
+  it("creates a VIEWER invite", async () => {
+    mockAdminSession();
+    userFindUniqueMock.mockResolvedValue(null);
+    inviteFindUniqueMock.mockResolvedValue(null);
+    workspaceFindUniqueMock.mockResolvedValue({ name: "Test Workspace" });
+    inviteUpsertMock.mockResolvedValue({
+      id: "invite-1",
+      email: "viewer@example.com",
+      role: "VIEWER",
+      token: "secure-token-123",
+      expiresAt: new Date("2099-01-01"),
+    });
+
+    const res = await POST(
+      makeRequest({ email: "viewer@example.com", role: "VIEWER" }),
+    );
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.invite.role).toBe("VIEWER");
   });
 
   it("rejects when user already belongs to a workspace", async () => {

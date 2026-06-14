@@ -4,6 +4,7 @@ import GoogleProvider from "next-auth/providers/google";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 import { generateWorkspaceSlug } from "./slug";
+import { UserRole } from "./roles";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -99,7 +100,7 @@ export const authOptions: NextAuthOptions = {
       if (token) {
         session.user.id = token.id as string;
         session.user.workspaceId = token.workspaceId as string;
-        session.user.role = token.role as string;
+        session.user.role = token.role as UserRole;
       }
       return session;
     },

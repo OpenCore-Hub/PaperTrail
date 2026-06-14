@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { teamInviteCounter, withMetrics } from "@/lib/metrics";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +12,7 @@ const acceptSchema = z.object({
   password: z.string().min(8),
 });
 
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
   try {
     const body = await req.json();
     const parsed = acceptSchema.parse(body);
@@ -22,10 +23,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!invite) {
-      return NextResponse.json(
-        { error: "Invite not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Invite not found" }, { status: 404 });
     }
 
     if (invite.expiresAt < new Date()) {
@@ -73,6 +71,8 @@ export async function POST(req: NextRequest) {
       return created;
     });
 
+    teamInviteCounter.inc({ operation: "accepted" });
+
     return NextResponse.json(
       {
         user: {
@@ -99,3 +99,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export const POST = withMetrics("/api/team/accept", handler);

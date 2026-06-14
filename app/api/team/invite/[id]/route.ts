@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { teamInviteCounter, withMetrics } from "@/lib/metrics";
 
 export const dynamic = "force-dynamic";
 
-export async function DELETE(
+async function handler(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
@@ -23,13 +24,12 @@ export async function DELETE(
       },
     });
     if (!invite) {
-      return NextResponse.json(
-        { error: "Invite not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Invite not found" }, { status: 404 });
     }
 
     await prisma.workspaceInvite.delete({ where: { id: params.id } });
+
+    teamInviteCounter.inc({ operation: "cancelled" });
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -40,3 +40,5 @@ export async function DELETE(
     );
   }
 }
+
+export const DELETE = withMetrics("/api/team/invite/[id]", handler);

@@ -8,6 +8,7 @@ import { UploadDocument } from "@/components/upload-document";
 import { SignOutButton } from "@/components/sign-out-button";
 import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";
+import { canManageDocuments, canManageWorkspace } from "@/lib/roles";
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
@@ -34,7 +35,7 @@ export default async function DashboardPage() {
             <span className="text-sm text-muted-foreground">
               {session.user.email}
             </span>
-            {session.user.role === "ADMIN" && (
+            {canManageWorkspace(session.user.role) && (
               <Button variant="outline" size="sm" asChild>
                 <Link href="/dashboard/settings/team">
                   <Settings className="mr-1 h-4 w-4" />
@@ -52,13 +53,15 @@ export default async function DashboardPage() {
           <div>
             <h2 className="text-2xl font-semibold">Documents</h2>
             <p className="text-muted-foreground">
-              Upload PDFs and create tracked share links.
+              {canManageDocuments(session.user.role)
+                ? "Upload PDFs and create tracked share links."
+                : "View documents and share links in your workspace."}
             </p>
           </div>
-          <UploadDocument />
+          {canManageDocuments(session.user.role) && <UploadDocument />}
         </div>
 
-        <DocumentList documents={documents} />
+        <DocumentList documents={documents} userRole={session.user.role} />
       </main>
     </div>
   );

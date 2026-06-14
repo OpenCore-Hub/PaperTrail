@@ -26,6 +26,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { canManageDocuments, type UserRole } from "@/lib/roles";
 
 interface DocumentListProps {
   documents: Array<{
@@ -35,13 +36,15 @@ interface DocumentListProps {
     createdAt: Date;
     _count: { links: number };
   }>;
+  userRole: UserRole;
 }
 
 interface DocumentCardProps {
   document: DocumentListProps["documents"][number];
+  userRole: UserRole;
 }
 
-function DocumentCard({ document }: DocumentCardProps) {
+function DocumentCard({ document, userRole }: DocumentCardProps) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -81,58 +84,65 @@ function DocumentCard({ document }: DocumentCardProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap gap-2">
-        <CreateLinkDialog documentId={document.id} />
-        <ManageLinksDialog documentId={document.id} />
+        {canManageDocuments(userRole) && (
+          <>
+            <CreateLinkDialog documentId={document.id} />
+            <ManageLinksDialog documentId={document.id} />
+          </>
+        )}
         <Button variant="outline" size="sm" asChild>
           <Link href={`/dashboard/analytics/${document.id}`}>
             <BarChart3 className="mr-1 h-4 w-4" />
             Analytics
           </Link>
         </Button>
-        <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-          <DialogTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-destructive hover:bg-destructive/10"
-            >
-              <Trash2 className="mr-1 h-4 w-4" />
-              Delete
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Delete document</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to delete{" "}
-                <strong>{document.filename}</strong>? This will also delete all
-                share links and analytics for this document. This action cannot
-                be undone.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter className="gap-2 sm:justify-end">
+        {canManageDocuments(userRole) && (
+          <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+            <DialogTrigger asChild>
               <Button
                 variant="outline"
-                onClick={() => setConfirmOpen(false)}
-                disabled={deleting}
+                size="sm"
+                data-testid="delete-document-button"
+                className="text-destructive hover:bg-destructive/10"
               >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={deleting}
-              >
-                {deleting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Trash2 className="mr-2 h-4 w-4" />
-                )}
+                <Trash2 className="mr-1 h-4 w-4" />
                 Delete
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Delete document</DialogTitle>
+                <DialogDescription>
+                  Are you sure you want to delete{" "}
+                  <strong>{document.filename}</strong>? This will also delete
+                  all share links and analytics for this document. This action
+                  cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="gap-2 sm:justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setConfirmOpen(false)}
+                  disabled={deleting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                >
+                  {deleting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="mr-2 h-4 w-4" />
+                  )}
+                  Delete
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </CardContent>
     </Card>
   );
@@ -146,7 +156,7 @@ function formatFileSize(bytes: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
-export function DocumentList({ documents }: DocumentListProps) {
+export function DocumentList({ documents, userRole }: DocumentListProps) {
   if (documents.length === 0) {
     return (
       <Card className="py-12 text-center">
@@ -164,7 +174,7 @@ export function DocumentList({ documents }: DocumentListProps) {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {documents.map((doc) => (
-        <DocumentCard key={doc.id} document={doc} />
+        <DocumentCard key={doc.id} document={doc} userRole={userRole} />
       ))}
     </div>
   );
