@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("api:health");
 
 export const dynamic = "force-dynamic";
 
@@ -15,22 +18,24 @@ async function checkDatabase(): Promise<HealthCheck> {
     return { name: "database", status: "ok" };
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Unknown error";
+    log.error({ error: detail }, "health.database_check_failed");
     return { name: "database", status: "error", detail };
   }
 }
 
 async function checkStorage(): Promise<HealthCheck> {
-  try {
-    const { UTApi } = await import("uploadthing/server");
-    const utapi = new UTApi();
-    // List files with a small limit as a lightweight connectivity check.
-    // This only verifies API reachability, not full upload/download.
-    await utapi.listFiles({ limit: 1 });
-    return { name: "storage", status: "ok" };
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : "Unknown error";
-    return { name: "storage", status: "error", detail };
+  // Avoid calling UploadThing on every health check: it can be slow, rate
+  // limited, and is outside our control plane. Instead verify that the token
+  // is configured, which is the only thing the application can guarantee.
+  const token = process.env.UPLOADTHING_TOKEN;
+  if (!token) {
+    return {
+      name: "storage",
+      status: "error",
+      detail: "UPLOADTHING_TOKEN is not configured",
+    };
   }
+  return { name: "storage", status: "ok" };
 }
 
 export async function GET() {

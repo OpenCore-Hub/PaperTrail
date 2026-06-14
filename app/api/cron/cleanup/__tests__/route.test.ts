@@ -2,12 +2,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { GET } from "../route";
 
-const { shareLinkDeleteManyMock, viewSessionDeleteManyMock } = vi.hoisted(
-  () => ({
-    shareLinkDeleteManyMock: vi.fn(),
-    viewSessionDeleteManyMock: vi.fn(),
-  }),
-);
+const {
+  shareLinkDeleteManyMock,
+  viewSessionUpdateManyMock,
+  viewSessionDeleteManyMock,
+} = vi.hoisted(() => ({
+  shareLinkDeleteManyMock: vi.fn(),
+  viewSessionUpdateManyMock: vi.fn(),
+  viewSessionDeleteManyMock: vi.fn(),
+}));
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -15,6 +18,7 @@ vi.mock("@/lib/prisma", () => ({
       deleteMany: shareLinkDeleteManyMock,
     },
     viewSession: {
+      updateMany: viewSessionUpdateManyMock,
       deleteMany: viewSessionDeleteManyMock,
     },
   },
@@ -51,9 +55,10 @@ describe("GET /api/cron/cleanup", () => {
     expect(res.status).toBe(401);
   });
 
-  it("deletes expired links and old sessions when authenticated", async () => {
+  it("deletes expired links, closes stale sessions, and deletes old sessions when authenticated", async () => {
     process.env.CRON_SECRET = "secret";
     shareLinkDeleteManyMock.mockResolvedValue({ count: 5 });
+    viewSessionUpdateManyMock.mockResolvedValue({ count: 3 });
     viewSessionDeleteManyMock.mockResolvedValue({ count: 12 });
 
     const res = await GET(makeRequest("Bearer secret"));
@@ -61,11 +66,21 @@ describe("GET /api/cron/cleanup", () => {
     const json = await res.json();
     expect(json.ok).toBe(true);
     expect(json.deletedExpiredLinks).toBe(5);
+    expect(json.closedStaleSessions).toBe(3);
     expect(json.deletedOldSessions).toBe(12);
 
     expect(shareLinkDeleteManyMock).toHaveBeenCalledWith({
       where: {
         expiresAt: { not: null, lt: expect.any(Date) },
+      },
+    });
+    expect(viewSessionUpdateManyMock).toHaveBeenCalledWith({
+      where: {
+        endedAt: null,
+        startedAt: { lt: expect.any(Date) },
+      },
+      data: {
+        endedAt: expect.any(Date),
       },
     });
     expect(viewSessionDeleteManyMock).toHaveBeenCalledWith({

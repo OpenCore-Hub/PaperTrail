@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { createLogger } from "@/lib/logger";
 import { z } from "zod";
+
+const log = createLogger("api:auth:reset-password");
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +52,7 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    console.error("Reset password error:", error);
+    log.error({ error }, "auth.reset_password_failed");
     return NextResponse.json(
       { error: "Failed to reset password" },
       { status: 500 },

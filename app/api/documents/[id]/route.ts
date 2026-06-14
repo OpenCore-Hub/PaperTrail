@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("api:documents");
 
 export const dynamic = "force-dynamic";
 
@@ -36,14 +39,17 @@ export async function DELETE(
       const utapi = new UTApi();
       await utapi.deleteFiles(document.storageKey);
     } catch (storageError) {
-      console.error("Failed to delete stored file:", storageError);
+      log.error(
+        { documentId: params.id, error: storageError },
+        "documents.storage_cleanup_failed",
+      );
     }
 
     await prisma.document.delete({ where: { id: params.id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Document delete error:", error);
+    log.error({ documentId: params.id, error }, "documents.delete_failed");
     return NextResponse.json(
       { error: "Failed to delete document" },
       { status: 500 },

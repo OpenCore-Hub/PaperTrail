@@ -1,12 +1,9 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma";
-import {
-  seedConstants,
-  writeSeedState,
-  type SeedState,
-} from "./fixtures/seed";
+import { seedConstants, writeSeedState, type SeedState } from "./fixtures/seed";
 
 export default async function globalSetup(): Promise<void> {
+  console.log("[e2e:setup] seeding test data...");
   const passwordHash = await bcrypt.hash(seedConstants.adminPassword, 10);
   const linkPasswordHash = await bcrypt.hash(seedConstants.passwordPlain, 10);
 
@@ -99,4 +96,5 @@ export default async function globalSetup(): Promise<void> {
   };
 
   writeSeedState(state);
+  console.log("[e2e:setup] seeded user", user.id, "workspace", workspace.id);
 }

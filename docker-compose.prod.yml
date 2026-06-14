@@ -34,16 +34,16 @@ services:
   backup:
     image: postgres:15-alpine
     restart: unless-stopped
+    env_file:
+      - .env.production.local
     volumes:
       - ./scripts/backup-db.sh:/usr/local/bin/backup-db.sh:ro
       - ./scripts/backup-entrypoint.sh:/usr/local/bin/backup-entrypoint.sh:ro
       - ./backups:/backups
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-dochub}:${POSTGRES_PASSWORD:-change-me-in-env}@db:5432/${POSTGRES_DB:-dochub}
+      # DATABASE_URL and backup settings are read from .env.production.local.
+      # BACKUP_DIR is pinned to the container path so the volume mount matches.
       BACKUP_DIR: /backups
-      BACKUP_RETENTION_DAYS: "7"
-      BACKUP_SCHEDULE: "0 3 * * *"
-      S3_BACKUP_BUCKET: ${S3_BACKUP_BUCKET:-}
     command: ["/usr/local/bin/backup-entrypoint.sh"]
 
   app:

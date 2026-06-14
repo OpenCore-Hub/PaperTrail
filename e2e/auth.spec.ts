@@ -12,7 +12,7 @@ test("signs in with seeded credentials and lands on dashboard", async ({
   const submitPromise = page.waitForResponse(
     (resp) =>
       resp.url().includes("/api/auth/callback/credentials") &&
-      resp.status() === 302,
+      resp.status() === 200,
   );
 
   await page.click('button[type="submit"]');

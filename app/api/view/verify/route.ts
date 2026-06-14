@@ -3,7 +3,11 @@ import bcrypt from "bcryptjs";
 import { customAlphabet } from "nanoid";
 import { prisma } from "@/lib/prisma";
 import { isAllowed } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/ip";
+import { createLogger } from "@/lib/logger";
 import { z } from "zod";
+
+const log = createLogger("api:view:verify");
 
 export const dynamic = "force-dynamic";
 
@@ -18,14 +22,6 @@ const GRANT_TTL_MINUTES = 5;
 
 // Rate limit: 10 verify attempts per link per IP per 15 minutes.
 const VERIFY_RATE_LIMIT = { maxRequests: 10, windowMs: 15 * 60 * 1000 };
-
-function getClientIp(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) {
-    return forwarded.split(",")[0]?.trim() ?? "unknown";
-  }
-  return req.ip ?? "unknown";
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -95,7 +91,7 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    console.error("Viewer verify error:", error);
+    log.error({ error }, "view.verify_failed");
     return NextResponse.json(
       { error: "Failed to verify access" },
       { status: 500 },

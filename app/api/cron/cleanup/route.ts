@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("api:cron:cleanup");
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Maximum age of an active (not yet ended) view session in hours.
+ *
+ * If a viewer closes the tab without sending the "end" heartbeat (e.g. mobile
+ * browser, crash, network loss), the session would otherwise accumulate
+ * duration forever. This cap closes stale sessions so analytics stay bounded.
+ */
+const MAX_SESSION_AGE_HOURS = 4;
 
 /**
  * Retention windows in days.
@@ -13,6 +25,12 @@ export const dynamic = "force-dynamic";
  */
 const EXPIRED_LINK_RETENTION_DAYS = 30;
 const VIEW_SESSION_RETENTION_DAYS = 90;
+
+function hoursAgo(hours: number): Date {
+  const d = new Date();
+  d.setHours(d.getHours() - hours);
+  return d;
+}
 
 function daysAgo(days: number): Date {
   const d = new Date();
@@ -48,6 +66,20 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    // Close sessions that have been open too long without an end heartbeat.
+    // This prevents infinitely accumulating duration when a viewer's browser
+    // fails to send the final event.
+    const staleSessionCutoff = hoursAgo(MAX_SESSION_AGE_HOURS);
+    const closedStaleSessionsResult = await prisma.viewSession.updateMany({
+      where: {
+        endedAt: null,
+        startedAt: { lt: staleSessionCutoff },
+      },
+      data: {
+        endedAt: new Date(),
+      },
+    });
+
     const oldSessionsResult = await prisma.viewSession.deleteMany({
       where: {
         startedAt: { lt: sessionsCutoff },
@@ -57,13 +89,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       deletedExpiredLinks: expiredLinksResult.count,
+      closedStaleSessions: closedStaleSessionsResult.count,
       deletedOldSessions: oldSessionsResult.count,
     });
   } catch (error) {
-    console.error("Cleanup cron error:", error);
-    return NextResponse.json(
-      { error: "Cleanup failed" },
-      { status: 500 },
-    );
+    log.error({ error }, "cleanup.failed");
+    return NextResponse.json({ error: "Cleanup failed" }, { status: 500 });
   }
 }
