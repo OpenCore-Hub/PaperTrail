@@ -7,11 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- PostgreSQL backup/restore scripts and Docker Compose backup sidecar.
-- Disaster recovery runbook (`docs/disaster-recovery.md`).
-
 ## [0.2.0] - 2026-06-14
 
 ### Added
@@ -26,7 +21,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Data retention cleanup cron endpoint (`/api/cron/cleanup`).
 - Password reset flow (forgot/reset API routes and pages).
 - Rate limiting and input validation for public viewer endpoints.
+- Redis-backed rate limiter with in-memory fallback for single-instance deployments.
 - Health check endpoint (`/api/health`) with database and UploadThing checks.
+- Production `Dockerfile` and `docker-compose.prod.yml` with PostgreSQL, Redis, and app services.
+- Security response headers including CSP, HSTS, X-Frame-Options, and Referrer-Policy.
+- GitHub Actions CI workflow with lint, type-check, unit tests, build, and Playwright E2E tests.
+- Sentry error tracking scaffold (enabled when `NEXT_PUBLIC_SENTRY_DSN` is set).
+- Playwright E2E test suite covering authentication and viewer access control.
+- PostgreSQL backup/restore scripts and Docker Compose backup sidecar.
+- Disaster recovery runbook (`docs/disaster-recovery.md`).
 - Vitest test framework and 51 automated tests covering auth, domains, email, rate limiting, invites, shares, documents, analytics, cron, password reset, viewer verify, and health.
 - GitHub pull request template.
 
