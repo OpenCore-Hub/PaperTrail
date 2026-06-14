@@ -88,7 +88,7 @@ export function CreateLinkDialog({ documentId }: CreateLinkDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" data-testid="create-link-button">
           <Link2 className="mr-1 h-4 w-4" />
           Share
         </Button>

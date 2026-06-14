@@ -64,7 +64,7 @@ function DocumentCard({ document }: DocumentCardProps) {
   }
 
   return (
-    <Card>
+    <Card data-document-id={document.id}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">

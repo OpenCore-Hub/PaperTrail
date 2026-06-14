@@ -45,6 +45,10 @@ NEXT_PUBLIC_SENTRY_RELEASE=dochub@0.2.0
 # 日志级别（可选）
 LOG_LEVEL=info
 
+# PDF 代理缓存（可选）
+# PDF_CACHE_DIR=/var/cache/dochub/pdf  # 多实例部署需使用共享存储
+# PDF_CACHE_TTL_MS=3600000             # 默认 1 小时
+
 # 数据库备份
 BACKUP_DIR=./backups                 # 备份存放目录
 BACKUP_RETENTION_DAYS=7              # 本地保留天数

@@ -11,7 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Structured JSON logging via Pino (`lib/logger.ts`) for production observability.
 - Sentry PII scrubbing (`token` query param) and release/environment configuration.
-- New E2E test for analytics dashboard (`e2e/analytics.spec.ts`).
+- New E2E tests for analytics dashboard (`e2e/analytics.spec.ts`) and team invitation flow (`e2e/team.spec.ts`).
+- **PDF proxy cache** (`lib/pdf-cache.ts`): `/api/view/pdf` caches fetched PDFs on disk with configurable TTL, and the cleanup cron prunes expired entries.
+- Unit tests for the PDF cache (`lib/__tests__/pdf-cache.test.ts`).
 
 ### Changed
 
@@ -20,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docker Compose backup service now reads database credentials from `.env.production.local` to stay consistent with the app service.
 - Sign-in page now fetches and passes the NextAuth CSRF token explicitly, fixing E2E and fast-submission scenarios.
 - `react-pdf` viewer is now loaded client-only via `next/dynamic`, eliminating SSR crashes and reducing `/v/[slug]` bundle size.
+- Added `data-testid` attributes to Share and Manage links buttons for more reliable E2E selectors.
 
 ### Fixed
 
