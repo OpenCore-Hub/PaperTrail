@@ -1,7 +1,9 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
+import { generateWorkspaceSlug } from "./slug";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -37,12 +39,54 @@ export const authOptions: NextAuthOptions = {
         };
       },
     }),
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID ?? "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+      allowDangerousEmailAccountLinking: true,
+    }),
   ],
   session: {
     strategy: "jwt",
     maxAge: 24 * 60 * 60, // 24 hours
   },
   callbacks: {
+    async signIn({ user, account }) {
+      if (account?.provider === "google" && user.email) {
+        const existing = await prisma.user.findUnique({
+          where: { email: user.email },
+        });
+
+        if (!existing) {
+          // First-time Google sign-in: create a personal workspace.
+          const workspace = await prisma.workspace.create({
+            data: {
+              name: `${user.name ?? user.email}'s workspace`,
+              slug: generateWorkspaceSlug(
+                `${user.name ?? user.email}'s workspace`,
+              ),
+            },
+          });
+
+          const created = await prisma.user.create({
+            data: {
+              email: user.email,
+              name: user.name,
+              role: "ADMIN",
+              workspaceId: workspace.id,
+            },
+          });
+
+          user.id = created.id;
+          user.workspaceId = created.workspaceId;
+          user.role = created.role;
+        } else {
+          user.id = existing.id;
+          user.workspaceId = existing.workspaceId;
+          user.role = existing.role;
+        }
+      }
+      return true;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
