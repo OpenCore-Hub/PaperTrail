@@ -1,8 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isAllowed } from "@/lib/rate-limit";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
+
+// Rate limits for analytics event ingestion.
+const START_RATE_LIMIT = { maxRequests: 20, windowMs: 60 * 1000 };
+const ACTION_RATE_LIMIT = { maxRequests: 60, windowMs: 60 * 1000 };
+
+function getClientIp(req: NextRequest): string {
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) {
+    return forwarded.split(",")[0]?.trim() ?? "unknown";
+  }
+  return req.ip ?? "unknown";
+}
 
 const viewActionSchema = z.discriminatedUnion("action", [
   z.object({
@@ -32,7 +45,16 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const parsed = viewActionSchema.parse(body);
 
+    const clientIp = getClientIp(req);
+
     if (parsed.action === "start") {
+      const rateLimitKey = `view:start:${clientIp}`;
+      if (!isAllowed(rateLimitKey, START_RATE_LIMIT)) {
+        return NextResponse.json(
+          { error: "Rate limit exceeded" },
+          { status: 429 },
+        );
+      }
       const grant = await prisma.viewerGrant.findUnique({
         where: { token: parsed.viewerToken },
         include: { link: true },
@@ -65,6 +87,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (parsed.action === "heartbeat") {
+      const key = `view:action:${parsed.sessionId}`;
+      if (!isAllowed(key, ACTION_RATE_LIMIT)) {
+        return NextResponse.json(
+          { error: "Rate limit exceeded" },
+          { status: 429 },
+        );
+      }
       await prisma.viewSession.update({
         where: { id: parsed.sessionId },
         data: {
@@ -75,6 +104,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (parsed.action === "end") {
+      const key = `view:action:${parsed.sessionId}`;
+      if (!isAllowed(key, ACTION_RATE_LIMIT)) {
+        return NextResponse.json(
+          { error: "Rate limit exceeded" },
+          { status: 429 },
+        );
+      }
       await prisma.viewSession.update({
         where: { id: parsed.sessionId },
         data: { endedAt: new Date() },
@@ -83,6 +119,19 @@ export async function POST(req: NextRequest) {
     }
 
     if (parsed.action === "page") {
+      const key = `view:action:${parsed.sessionId}`;
+      if (!isAllowed(key, ACTION_RATE_LIMIT)) {
+        return NextResponse.json(
+          { error: "Rate limit exceeded" },
+          { status: 429 },
+        );
+      }
+      if (parsed.pageNumber < 1) {
+        return NextResponse.json(
+          { error: "Invalid page number" },
+          { status: 400 },
+        );
+      }
       await prisma.pageView.create({
         data: {
           sessionId: parsed.sessionId,

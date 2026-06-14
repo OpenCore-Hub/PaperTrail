@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { customAlphabet } from "nanoid";
 import { prisma } from "@/lib/prisma";
+import { isAllowed } from "@/lib/rate-limit";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -15,10 +16,30 @@ const verifySchema = z.object({
 // 5-minute viewer access grant
 const GRANT_TTL_MINUTES = 5;
 
+// Rate limit: 10 verify attempts per link per IP per 15 minutes.
+const VERIFY_RATE_LIMIT = { maxRequests: 10, windowMs: 15 * 60 * 1000 };
+
+function getClientIp(req: NextRequest): string {
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) {
+    return forwarded.split(",")[0]?.trim() ?? "unknown";
+  }
+  return req.ip ?? "unknown";
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const parsed = verifySchema.parse(body);
+
+    const clientIp = getClientIp(req);
+    const rateLimitKey = `verify:${parsed.linkId}:${clientIp}`;
+    if (!isAllowed(rateLimitKey, VERIFY_RATE_LIMIT)) {
+      return NextResponse.json(
+        { error: "Too many attempts. Please try again later." },
+        { status: 429 },
+      );
+    }
 
     const link = await prisma.shareLink.findUnique({
       where: { id: parsed.linkId },
