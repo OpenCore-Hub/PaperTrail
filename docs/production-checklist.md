@@ -40,6 +40,12 @@ CRON_SECRET=                # 随机字符串，外部 cron 调用时放在 Auth
 # Sentry 错误追踪（可选但强烈建议）
 NEXT_PUBLIC_SENTRY_DSN=https://xxx@yyy.ingest.sentry.io/zzz
 NEXT_PUBLIC_SENTRY_ENVIRONMENT=production
+
+# 数据库备份
+BACKUP_DIR=./backups                 # 备份存放目录
+BACKUP_RETENTION_DAYS=7              # 本地保留天数
+BACKUP_SCHEDULE="0 3 * * *"          # 备份 cron 表达式
+S3_BACKUP_BUCKET=                    # 可选：同步到 S3 bucket
 ```
 
 ## 2. 首次部署步骤
@@ -147,3 +153,14 @@ npx playwright test
 ```
 
 CI 中已集成 Playwright，见 `.github/workflows/ci.yml` 的 `e2e` job。
+
+## 11. 数据库备份与灾难恢复
+
+1. 确认 `BACKUP_DIR` 已挂载到持久化存储（Docker Compose 中已自动挂载 `./backups`）。
+2. `docker-compose.prod.yml` 中的 `backup` 服务会按 `BACKUP_SCHEDULE` 自动执行备份。
+3. 手动触发备份：
+   ```bash
+   docker-compose -f docker-compose.prod.yml exec backup /usr/local/bin/backup-db.sh
+   ```
+4. 恢复流程见 `docs/disaster-recovery.md`。
+5. 定期做恢复演练到非生产数据库。
