@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FileText, BarChart3 } from "lucide-react";
 import { CreateLinkDialog } from "./create-link-dialog";
+import { ManageLinksDialog } from "./manage-links-dialog";
 
 interface DocumentListProps {
   documents: Array<{
@@ -66,8 +67,9 @@ export function DocumentList({ documents }: DocumentListProps) {
               {doc._count.links} link{doc._count.links === 1 ? "" : "s"}
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex gap-2">
+          <CardContent className="flex flex-wrap gap-2">
             <CreateLinkDialog documentId={doc.id} />
+            <ManageLinksDialog documentId={doc.id} />
             <Button variant="outline" size="sm" asChild>
               <Link href={`/dashboard/analytics/${doc.id}`}>
                 <BarChart3 className="mr-1 h-4 w-4" />
