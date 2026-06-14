@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Workspace {
+  id            String    @id @default(uuid())
+  name          String
+  slug          String    @unique
+  customDomain  String?   @unique @map("custom_domain")
+  plan          String    @default("free")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  users         User[]
+  documents     Document[]
+
+  @@map("workspaces")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  name          String?
+  password      String?
+  role          UserRole  @default(EDITOR)
+  workspaceId   String    @map("workspace_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  documents     Document[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  EDITOR
+}
+
+model Document {
+  id            String    @id @default(uuid())
+  workspaceId   String    @map("workspace_id")
+  uploadedBy    String    @map("uploaded_by")
+  filename      String
+  storageKey    String    @map("storage_key")
+  fileSize      Int       @map("file_size")
+  pageCount     Int       @default(0) @map("page_count")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  uploader      User      @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+  links         ShareLink[]
+
+  @@map("documents")
+}
+
+model ShareLink {
+  id              String    @id @default(uuid())
+  documentId      String    @map("document_id")
+  slug            String    @unique
+  passwordHash    String?   @map("password_hash")
+  expiresAt       DateTime? @map("expires_at")
+  emailGate       Boolean   @default(false) @map("email_gate")
+  allowDownload   Boolean   @default(false) @map("allow_download")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  document        Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  sessions        ViewSession[]
+  viewerGrants    ViewerGrant[]
+
+  @@map("share_links")
+}
+
+model ViewSession {
+  id                String    @id @default(uuid())
+  linkId            String    @map("link_id")
+  fingerprint       String
+  viewerEmail       String?   @map("viewer_email")
+  startedAt         DateTime  @default(now()) @map("started_at")
+  endedAt           DateTime? @map("ended_at")
+  durationSeconds   Int       @default(0) @map("duration_seconds")
+
+  link              ShareLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  pageViews         PageView[]
+
+  @@map("view_sessions")
+}
+
+model ViewerGrant {
+  id        String   @id @default(uuid())
+  linkId    String   @map("link_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  link      ShareLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@map("viewer_grants")
+}
+
+model PageView {
+  id              String    @id @default(uuid())
+  sessionId       String    @map("session_id")
+  pageNumber      Int       @map("page_number")
+  enteredAt       DateTime  @default(now()) @map("entered_at")
+  durationSeconds Int       @default(0) @map("duration_seconds")
+
+  session         ViewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("page_views")
+}
