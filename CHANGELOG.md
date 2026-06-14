@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- PostgreSQL backup/restore scripts and Docker Compose backup sidecar.
+- Disaster recovery runbook (`docs/disaster-recovery.md`).
+
 ## [0.2.0] - 2026-06-14
 
 ### Added

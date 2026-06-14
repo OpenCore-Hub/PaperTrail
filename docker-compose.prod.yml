@@ -11,7 +11,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dochub} -d ${POSTGRES_DB:-dochub}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-dochub} -d ${POSTGRES_DB:-dochub}",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -26,6 +30,21 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+
+  backup:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    volumes:
+      - ./scripts/backup-db.sh:/usr/local/bin/backup-db.sh:ro
+      - ./scripts/backup-entrypoint.sh:/usr/local/bin/backup-entrypoint.sh:ro
+      - ./backups:/backups
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dochub}:${POSTGRES_PASSWORD:-change-me-in-env}@db:5432/${POSTGRES_DB:-dochub}
+      BACKUP_DIR: /backups
+      BACKUP_RETENTION_DAYS: "7"
+      BACKUP_SCHEDULE: "0 3 * * *"
+      S3_BACKUP_BUCKET: ${S3_BACKUP_BUCKET:-}
+    command: ["/usr/local/bin/backup-entrypoint.sh"]
 
   app:
     build:
