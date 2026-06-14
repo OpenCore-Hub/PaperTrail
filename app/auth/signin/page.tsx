@@ -110,12 +110,25 @@ export default function SignInPage() {
             Google
           </Button>
 
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link href="/auth/signup" className="text-primary hover:underline">
-              Sign up
-            </Link>
-          </p>
+          <div className="mt-4 space-y-2 text-center text-sm text-muted-foreground">
+            <p>
+              <Link
+                href="/auth/forgot-password"
+                className="text-primary hover:underline"
+              >
+                Forgot your password?
+              </Link>
+            </p>
+            <p>
+              Don&apos;t have an account?{" "}
+              <Link
+                href="/auth/signup"
+                className="text-primary hover:underline"
+              >
+                Sign up
+              </Link>
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>
