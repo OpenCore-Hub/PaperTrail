@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { useEffect, useState } from "react";
+import { getCsrfToken, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -15,11 +15,24 @@ export default function SignInPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [csrfToken, setCsrfToken] = useState<string>("");
+
+  useEffect(() => {
+    // Ensure the CSRF cookie is set before the credentials form is submitted.
+    // This is especially important for test environments and fast form submissions.
+    getCsrfToken().then((token) => setCsrfToken(token ?? ""));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+
+    // Ensure we have a CSRF token even if the initial fetch hasn't completed
+    // (e.g. very fast test submissions or slow networks).
+    const token = csrfToken || (await getCsrfToken()) || "";
+
     const result = await signIn("credentials", {
+      csrfToken: token,
       email,
       password,
       redirect: false,

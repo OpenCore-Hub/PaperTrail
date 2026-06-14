@@ -40,6 +40,10 @@ CRON_SECRET=                # 随机字符串，外部 cron 调用时放在 Auth
 # Sentry 错误追踪（可选但强烈建议）
 NEXT_PUBLIC_SENTRY_DSN=https://xxx@yyy.ingest.sentry.io/zzz
 NEXT_PUBLIC_SENTRY_ENVIRONMENT=production
+NEXT_PUBLIC_SENTRY_RELEASE=dochub@0.2.0
+
+# 日志级别（可选）
+LOG_LEVEL=info
 
 # 数据库备份
 BACKUP_DIR=./backups                 # 备份存放目录
@@ -121,6 +125,7 @@ curl https://your-domain.com/api/health
 
 - [ ] 数据库开启自动备份（或云数据库快照）。
 - [ ] UploadThing 文件保留策略符合合规要求。
+- [ ] **UploadThing 启用静态加密（SSE-S3 / AES-256）**：在 UploadThing dashboard 确认 bucket encryption 已开启；这是 PRD 对 PDF rest 加密的硬性要求。若使用自管 S3，配置 bucket default encryption（SSE-S3 或 SSE-KMS）。
 - [ ] `NEXTAUTH_SECRET`、`CRON_SECRET` 使用随机强密码，不提交到仓库。
 - [ ] 生产服务器防火墙仅开放 80/443。
 - [ ] 使用 HTTPS（Let's Encrypt / 云证书）。
@@ -156,11 +161,12 @@ CI 中已集成 Playwright，见 `.github/workflows/ci.yml` 的 `e2e` job。
 
 ## 11. 数据库备份与灾难恢复
 
-1. 确认 `BACKUP_DIR` 已挂载到持久化存储（Docker Compose 中已自动挂载 `./backups`）。
-2. `docker-compose.prod.yml` 中的 `backup` 服务会按 `BACKUP_SCHEDULE` 自动执行备份。
-3. 手动触发备份：
+1. 确认 `.env.production.local` 中已配置 `DATABASE_URL`、`BACKUP_RETENTION_DAYS`、`BACKUP_SCHEDULE` 和可选的 `S3_BACKUP_BUCKET`。
+2. 确认 `BACKUP_DIR` 已挂载到持久化存储（Docker Compose 中已自动挂载 `./backups`）。
+3. `docker-compose.prod.yml` 中的 `backup` 服务会按 `BACKUP_SCHEDULE` 自动执行备份；它从 `.env.production.local` 读取数据库凭据，确保与 app 服务一致。
+4. 手动触发备份：
    ```bash
    docker-compose -f docker-compose.prod.yml exec backup /usr/local/bin/backup-db.sh
    ```
-4. 恢复流程见 `docs/disaster-recovery.md`。
-5. 定期做恢复演练到非生产数据库。
+5. 恢复流程见 `docs/disaster-recovery.md`。
+6. 定期做恢复演练到非生产数据库。

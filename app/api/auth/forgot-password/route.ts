@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { customAlphabet } from "nanoid";
 import { prisma } from "@/lib/prisma";
 import { sendPasswordResetEmail } from "@/lib/email";
+import { createLogger } from "@/lib/logger";
 import { z } from "zod";
+
+const log = createLogger("api:auth:forgot-password");
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +65,7 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    console.error("Forgot password error:", error);
+    log.error({ error }, "auth.forgot_password_failed");
     return NextResponse.json(
       { error: "Failed to send reset email" },
       { status: 500 },

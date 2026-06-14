@@ -1,21 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isAllowed } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/ip";
+import { createLogger } from "@/lib/logger";
 import { z } from "zod";
+
+const log = createLogger("api:view");
 
 export const dynamic = "force-dynamic";
 
 // Rate limits for analytics event ingestion.
 const START_RATE_LIMIT = { maxRequests: 20, windowMs: 60 * 1000 };
 const ACTION_RATE_LIMIT = { maxRequests: 60, windowMs: 60 * 1000 };
-
-function getClientIp(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) {
-    return forwarded.split(",")[0]?.trim() ?? "unknown";
-  }
-  return req.ip ?? "unknown";
-}
 
 const viewActionSchema = z.discriminatedUnion("action", [
   z.object({
@@ -149,7 +145,7 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    console.error("View API error:", error);
+    log.error({ error }, "view.event_failed");
     return NextResponse.json(
       { error: "Failed to process view event" },
       { status: 500 },

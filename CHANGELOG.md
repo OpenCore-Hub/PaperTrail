@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Structured JSON logging via Pino (`lib/logger.ts`) for production observability.
+- Sentry PII scrubbing (`token` query param) and release/environment configuration.
+- New E2E test for analytics dashboard (`e2e/analytics.spec.ts`).
+
+### Changed
+
+- **Analytics aggregation is now pushed to PostgreSQL** (`lib/analytics.ts`) instead of loading all sessions into memory, improving scalability.
+- Health check storage probe now verifies `UPLOADTHING_TOKEN` configuration instead of calling UploadThing on every request.
+- Docker Compose backup service now reads database credentials from `.env.production.local` to stay consistent with the app service.
+- Sign-in page now fetches and passes the NextAuth CSRF token explicitly, fixing E2E and fast-submission scenarios.
+- `react-pdf` viewer is now loaded client-only via `next/dynamic`, eliminating SSR crashes and reducing `/v/[slug]` bundle size.
+
+### Fixed
+
+- Prisma migrations were non-contiguous (first migration referenced non-existent tables). Replaced with a single self-contained `20260614000000_init` migration so `prisma migrate deploy` works on fresh databases.
+- Stale viewer sessions no longer accumulate duration forever: cleanup cron closes sessions open for more than 4 hours.
+- Removed duplicated `getClientIp` implementations; moved to `lib/ip.ts`.
+- E2E auth test now waits for the credentials callback's 200 response instead of a 302 redirect.
+
 ## [0.2.0] - 2026-06-14
 
 ### Added

@@ -142,7 +142,7 @@ export function AnalyticsDashboard({
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <Card>
+        <Card data-testid="stat-total-views">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Total views
@@ -152,7 +152,7 @@ export function AnalyticsDashboard({
             <div className="text-3xl font-bold">{data.summary.totalViews}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card data-testid="stat-unique-viewers">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Unique viewers
@@ -164,7 +164,7 @@ export function AnalyticsDashboard({
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card data-testid="stat-total-time">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Total time
@@ -176,7 +176,7 @@ export function AnalyticsDashboard({
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card data-testid="stat-avg-time">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Avg. time

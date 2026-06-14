@@ -1,18 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { getDocumentAnalytics } from "@/lib/analytics";
 
-const { mockDocumentFindFirst, mockShareLinkFindMany, mockPageViewGroupBy } =
+const { mockDocumentFindFirst, mockQueryRaw, mockViewSessionFindMany } =
   vi.hoisted(() => ({
     mockDocumentFindFirst: vi.fn(),
-    mockShareLinkFindMany: vi.fn(),
-    mockPageViewGroupBy: vi.fn(),
+    mockQueryRaw: vi.fn(),
+    mockViewSessionFindMany: vi.fn(),
   }));
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     document: { findFirst: mockDocumentFindFirst },
-    shareLink: { findMany: mockShareLinkFindMany },
-    pageView: { groupBy: mockPageViewGroupBy },
+    $queryRaw: mockQueryRaw,
+    viewSession: { findMany: mockViewSessionFindMany },
   },
 }));
 
@@ -21,7 +21,7 @@ describe("getDocumentAnalytics", () => {
     vi.clearAllMocks();
   });
 
-  it("aggregates views, unique viewers, and page-level data", async () => {
+  it("aggregates views, unique viewers, and page-level data from the database", async () => {
     const now = new Date();
     const day = now.toISOString().split("T")[0];
 
@@ -29,32 +29,39 @@ describe("getDocumentAnalytics", () => {
       id: "doc-1",
       filename: "test.pdf",
     });
-    mockShareLinkFindMany.mockResolvedValue([
+
+    mockQueryRaw.mockImplementation((query: TemplateStringsArray) => {
+      const sql = Array.isArray(query) ? query.join("?") : String(query);
+      if (sql.includes("COUNT(DISTINCT")) {
+        return [
+          {
+            totalViews: 2,
+            uniqueViewers: 1,
+            totalDuration: 30,
+          },
+        ];
+      }
+      if (sql.includes("DATE(vs.started_at)")) {
+        return [{ date: day, views: 2 }];
+      }
+      if (sql.includes("pv.page_number")) {
+        return [{ pageNumber: 1, views: 2, totalSeconds: 30 }];
+      }
+      return [];
+    });
+
+    mockViewSessionFindMany.mockResolvedValue([
       {
-        id: "link-1",
-        sessions: [
-          {
-            id: "session-1",
-            fingerprint: "fp-1",
-            viewerEmail: "viewer@example.com",
-            startedAt: now,
-            durationSeconds: 10,
-          },
-          {
-            id: "session-2",
-            fingerprint: "fp-1",
-            viewerEmail: null,
-            startedAt: now,
-            durationSeconds: 20,
-          },
-        ],
+        id: "session-1",
+        startedAt: now,
+        durationSeconds: 10,
+        viewerEmail: "viewer@example.com",
       },
-    ]);
-    mockPageViewGroupBy.mockResolvedValue([
       {
-        pageNumber: 1,
-        _count: { pageNumber: 2 },
-        _sum: { durationSeconds: 30 },
+        id: "session-2",
+        startedAt: now,
+        durationSeconds: 20,
+        viewerEmail: null,
       },
     ]);
 
@@ -76,6 +83,17 @@ describe("getDocumentAnalytics", () => {
     expect(mockDocumentFindFirst).toHaveBeenCalledWith({
       where: { id: "doc-1", workspaceId: "ws-1" },
       select: { id: true, filename: true },
+    });
+    expect(mockViewSessionFindMany).toHaveBeenCalledWith({
+      where: { link: { documentId: "doc-1" } },
+      orderBy: { startedAt: "desc" },
+      take: 50,
+      select: {
+        id: true,
+        startedAt: true,
+        durationSeconds: true,
+        viewerEmail: true,
+      },
     });
   });
 
