@@ -4,19 +4,23 @@ import { customAlphabet } from "nanoid";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendInviteEmail } from "@/lib/email";
+import { teamInviteCounter, withMetrics } from "@/lib/metrics";
+import { UserRole } from "@/lib/roles";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
 const inviteSchema = z.object({
   email: z.string().email(),
-  role: z.enum(["ADMIN", "EDITOR"]).default("EDITOR"),
+  role: z
+    .enum([UserRole.ADMIN, UserRole.EDITOR, UserRole.VIEWER])
+    .default(UserRole.EDITOR),
 });
 
 // 7-day invite token
 const INVITE_TTL_DAYS = 7;
 
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.workspaceId || session.user.role !== "ADMIN") {
@@ -88,6 +92,8 @@ export async function POST(req: NextRequest) {
       invitedByName: session.user.name,
     });
 
+    teamInviteCounter.inc({ operation: "created" });
+
     return NextResponse.json(
       {
         invite: {
@@ -118,3 +124,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export const POST = withMetrics("/api/team/invite", handler);

@@ -35,14 +35,14 @@ interface Member {
   id: string;
   email: string;
   name: string | null;
-  role: "ADMIN" | "EDITOR";
+  role: "ADMIN" | "EDITOR" | "VIEWER";
   createdAt: string;
 }
 
 interface Invite {
   id: string;
   email: string;
-  role: "ADMIN" | "EDITOR";
+  role: "ADMIN" | "EDITOR" | "VIEWER";
   token: string;
   expiresAt: string;
   createdAt: string;
@@ -58,7 +58,7 @@ export function TeamManagement() {
   const [data, setData] = useState<TeamData | null>(null);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<"ADMIN" | "EDITOR">("EDITOR");
+  const [role, setRole] = useState<"ADMIN" | "EDITOR" | "VIEWER">("EDITOR");
   const [inviting, setInviting] = useState(false);
 
   useEffect(() => {
@@ -120,7 +120,10 @@ export function TeamManagement() {
     router.refresh();
   }
 
-  async function updateRole(memberId: string, newRole: "ADMIN" | "EDITOR") {
+  async function updateRole(
+    memberId: string,
+    newRole: "ADMIN" | "EDITOR" | "VIEWER",
+  ) {
     const res = await fetch(`/api/team/members/${memberId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -226,13 +229,16 @@ export function TeamManagement() {
               <Label htmlFor="invite-role">Role</Label>
               <Select
                 value={role}
-                onValueChange={(v) => setRole(v as "ADMIN" | "EDITOR")}
+                onValueChange={(v) =>
+                  setRole(v as "ADMIN" | "EDITOR" | "VIEWER")
+                }
               >
                 <SelectTrigger id="invite-role">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="EDITOR">Editor</SelectItem>
+                  <SelectItem value="VIEWER">Viewer</SelectItem>
                   <SelectItem value="ADMIN">Admin</SelectItem>
                 </SelectContent>
               </Select>
@@ -283,7 +289,10 @@ export function TeamManagement() {
                       <Select
                         value={member.role}
                         onValueChange={(v) =>
-                          updateRole(member.id, v as "ADMIN" | "EDITOR")
+                          updateRole(
+                            member.id,
+                            v as "ADMIN" | "EDITOR" | "VIEWER",
+                          )
                         }
                       >
                         <SelectTrigger className="w-28">
@@ -291,6 +300,7 @@ export function TeamManagement() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="EDITOR">Editor</SelectItem>
+                          <SelectItem value="VIEWER">Viewer</SelectItem>
                           <SelectItem value="ADMIN">Admin</SelectItem>
                         </SelectContent>
                       </Select>

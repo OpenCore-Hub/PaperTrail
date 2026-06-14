@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
-import { Slot } from "@radix-ui/react-slot";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -26,11 +25,15 @@ function DialogTrigger({
   className,
   ...props
 }: DialogTriggerProps) {
-  if (asChild) {
+  if (asChild && React.isValidElement(children)) {
     return (
-      <Slot data-slot="dialog-trigger" className={className}>
-        {children}
-      </Slot>
+      <DialogPrimitive.Trigger
+        data-slot="dialog-trigger"
+        {...props}
+        render={React.cloneElement(children, {
+          className: cn(children.props.className, className),
+        })}
+      />
     );
   }
   return (

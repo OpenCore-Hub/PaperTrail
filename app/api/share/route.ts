@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateShareSlug } from "@/lib/slug";
+import { canManageDocuments, type UserRole } from "@/lib/roles";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,10 @@ const createLinkSchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.workspaceId) {
+    if (
+      !session?.user?.workspaceId ||
+      !canManageDocuments(session.user.role as UserRole)
+    ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

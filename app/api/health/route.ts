@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createLogger } from "@/lib/logger";
+import { healthCheckCounter, withMetrics } from "@/lib/metrics";
 
 const log = createLogger("api:health");
 
@@ -38,9 +39,11 @@ async function checkStorage(): Promise<HealthCheck> {
   return { name: "storage", status: "ok" };
 }
 
-export async function GET() {
+async function handler() {
   const checks = await Promise.all([checkDatabase(), checkStorage()]);
   const healthy = checks.every((c) => c.status === "ok");
+
+  healthCheckCounter.inc({ status: healthy ? "ok" : "degraded" });
 
   return NextResponse.json(
     {
@@ -59,3 +62,5 @@ export async function GET() {
     { status: healthy ? 200 : 503 },
   );
 }
+
+export const GET = withMetrics("/api/health", handler);

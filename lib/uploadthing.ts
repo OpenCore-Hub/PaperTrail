@@ -2,20 +2,40 @@ import { createUploadthing, type FileRouter } from "uploadthing/next";
 import { getServerSession } from "next-auth";
 import { authOptions } from "./auth";
 import { prisma } from "./prisma";
+import { canManageDocuments, type UserRole } from "./roles";
 
 const f = createUploadthing();
+
+interface UploadSession {
+  user?: {
+    id?: string;
+    workspaceId?: string;
+    role?: string;
+  };
+}
+
+export function authorizePdfUpload(session: UploadSession | null): {
+  userId: string;
+  workspaceId: string;
+} {
+  if (
+    !session?.user?.id ||
+    !session?.user?.workspaceId ||
+    !canManageDocuments(session.user.role as UserRole)
+  ) {
+    throw new Error("Unauthorized");
+  }
+  return {
+    userId: session.user.id,
+    workspaceId: session.user.workspaceId,
+  };
+}
 
 export const ourFileRouter = {
   pdfUploader: f({ pdf: { maxFileSize: "32MB" } })
     .middleware(async () => {
       const session = await getServerSession(authOptions);
-      if (!session?.user?.id || !session?.user?.workspaceId) {
-        throw new Error("Unauthorized");
-      }
-      return {
-        userId: session.user.id,
-        workspaceId: session.user.workspaceId,
-      };
+      return authorizePdfUpload(session);
     })
     .onUploadComplete(async ({ metadata, file }) => {
       const MAX_APP_SIZE_BYTES = 20 * 1024 * 1024;

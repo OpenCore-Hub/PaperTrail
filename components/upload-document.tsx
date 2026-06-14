@@ -29,13 +29,14 @@ export function UploadDocument() {
       }}
     >
       <DialogTrigger asChild>
-        <Button>Upload PDF</Button>
+        <Button data-testid="upload-pdf-button">Upload PDF</Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Upload a PDF</DialogTitle>
         </DialogHeader>
         <UploadDropzone
+          data-testid="upload-dropzone"
           endpoint="pdfUploader"
           onBeforeUploadBegin={(files) => {
             const oversized = files.find((f) => f.size > MAX_PDF_SIZE_BYTES);

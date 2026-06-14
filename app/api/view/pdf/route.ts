@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { pdfCache } from "@/lib/pdf-cache";
 import { createLogger } from "@/lib/logger";
+import { pdfCacheCounter, withMetrics } from "@/lib/metrics";
 
 const log = createLogger("api:view:pdf");
 
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 // How long the browser/CDN may cache a successfully authenticated PDF response.
 const CLIENT_CACHE_MAX_AGE_SECONDS = 60;
 
-export async function GET(req: NextRequest) {
+async function handler(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const token = searchParams.get("token");
@@ -55,6 +56,7 @@ export async function GET(req: NextRequest) {
     const cached = await pdfCache.get(document.storageKey);
     if (cached) {
       log.debug({ storageKey: document.storageKey }, "pdf.serve_from_cache");
+      pdfCacheCounter.inc({ outcome: "hit" });
       const headers = new Headers();
       headers.set("Content-Type", cached.metadata.contentType);
       headers.set(
@@ -79,6 +81,7 @@ export async function GET(req: NextRequest) {
         { storageKey: document.storageKey, status: upstream.status },
         "pdf.upstream_fetch_failed",
       );
+      pdfCacheCounter.inc({ outcome: "upstream_error" });
       return NextResponse.json(
         { error: "Failed to load document" },
         { status: 502 },
@@ -95,6 +98,8 @@ export async function GET(req: NextRequest) {
       contentType,
       size: buffer.length,
     });
+
+    pdfCacheCounter.inc({ outcome: "miss" });
 
     const headers = new Headers();
     headers.set("Content-Type", contentType);
@@ -113,9 +118,12 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     log.error({ error }, "pdf.serve_failed");
+    pdfCacheCounter.inc({ outcome: "error" });
     return NextResponse.json(
       { error: "Failed to serve document" },
       { status: 500 },
     );
   }
 }
+
+export const GET = withMetrics("/api/view/pdf", handler);

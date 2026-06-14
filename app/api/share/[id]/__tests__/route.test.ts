@@ -2,17 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { GET, PATCH, DELETE } from "../route";
 
-const {
-  getServerSessionMock,
-  findFirstMock,
-  updateMock,
-  deleteMock,
-} = vi.hoisted(() => ({
-  getServerSessionMock: vi.fn(),
-  findFirstMock: vi.fn(),
-  updateMock: vi.fn(),
-  deleteMock: vi.fn(),
-}));
+const { getServerSessionMock, findFirstMock, updateMock, deleteMock } =
+  vi.hoisted(() => ({
+    getServerSessionMock: vi.fn(),
+    findFirstMock: vi.fn(),
+    updateMock: vi.fn(),
+    deleteMock: vi.fn(),
+  }));
 
 vi.mock("next-auth", () => ({
   getServerSession: getServerSessionMock,
@@ -39,7 +35,7 @@ function makeRequest(
   }) as NextRequest;
 }
 
-function mockSession(role: "ADMIN" | "EDITOR" = "ADMIN") {
+function mockSession(role: "ADMIN" | "EDITOR" | "VIEWER" = "ADMIN") {
   getServerSessionMock.mockResolvedValue({
     user: { id: "user-1", workspaceId: "ws-1", role },
   });
@@ -96,6 +92,14 @@ describe("PATCH /api/share/[id]", () => {
 
   it("rejects unauthenticated users", async () => {
     getServerSessionMock.mockResolvedValue(null);
+    const res = await PATCH(makeRequest("PATCH", { emailGate: true }), {
+      params: { id: "link-1" },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects VIEWER role", async () => {
+    mockSession("VIEWER");
     const res = await PATCH(makeRequest("PATCH", { emailGate: true }), {
       params: { id: "link-1" },
     });
@@ -188,14 +192,26 @@ describe("DELETE /api/share/[id]", () => {
 
   it("rejects unauthenticated users", async () => {
     getServerSessionMock.mockResolvedValue(null);
-    const res = await DELETE(makeRequest("DELETE"), { params: { id: "link-1" } });
+    const res = await DELETE(makeRequest("DELETE"), {
+      params: { id: "link-1" },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects VIEWER role", async () => {
+    mockSession("VIEWER");
+    const res = await DELETE(makeRequest("DELETE"), {
+      params: { id: "link-1" },
+    });
     expect(res.status).toBe(401);
   });
 
   it("deletes the link", async () => {
     mockSession();
     mockLink();
-    const res = await DELETE(makeRequest("DELETE"), { params: { id: "link-1" } });
+    const res = await DELETE(makeRequest("DELETE"), {
+      params: { id: "link-1" },
+    });
     expect(res.status).toBe(200);
     expect(deleteMock).toHaveBeenCalledWith({ where: { id: "link-1" } });
   });

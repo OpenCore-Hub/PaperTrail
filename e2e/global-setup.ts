@@ -93,6 +93,7 @@ export default async function globalSetup(): Promise<void> {
     openLinkId: openLink.id,
     passwordLinkId: passwordLink.id,
     expiredLinkId: expiredLink.id,
+    uploadedStorageKeys: [],
   };
 
   writeSeedState(state);

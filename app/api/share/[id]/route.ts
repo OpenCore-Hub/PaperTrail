@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import bcrypt from "bcryptjs";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { canManageDocuments, type UserRole } from "@/lib/roles";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -35,10 +36,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const link = await authorizeLinkAccess(
-      params.id,
-      session.user.workspaceId,
-    );
+    const link = await authorizeLinkAccess(params.id, session.user.workspaceId);
     if (!link) {
       return NextResponse.json({ error: "Link not found" }, { status: 404 });
     }
@@ -70,14 +68,14 @@ export async function PATCH(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.workspaceId) {
+    if (
+      !session?.user?.workspaceId ||
+      !canManageDocuments(session.user.role as UserRole)
+    ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const link = await authorizeLinkAccess(
-      params.id,
-      session.user.workspaceId,
-    );
+    const link = await authorizeLinkAccess(params.id, session.user.workspaceId);
     if (!link) {
       return NextResponse.json({ error: "Link not found" }, { status: 404 });
     }
@@ -87,7 +85,9 @@ export async function PATCH(
 
     let passwordHash: string | null | undefined = undefined;
     if (parsed.password !== undefined) {
-      passwordHash = parsed.password ? await bcrypt.hash(parsed.password, 10) : null;
+      passwordHash = parsed.password
+        ? await bcrypt.hash(parsed.password, 10)
+        : null;
     }
 
     const updated = await prisma.shareLink.update({
@@ -137,14 +137,14 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.workspaceId) {
+    if (
+      !session?.user?.workspaceId ||
+      !canManageDocuments(session.user.role as UserRole)
+    ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const link = await authorizeLinkAccess(
-      params.id,
-      session.user.workspaceId,
-    );
+    const link = await authorizeLinkAccess(params.id, session.user.workspaceId);
     if (!link) {
       return NextResponse.json({ error: "Link not found" }, { status: 404 });
     }
