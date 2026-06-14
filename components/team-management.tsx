@@ -92,7 +92,21 @@ export function TeamManagement() {
       return;
     }
 
-    toast.success("Invite sent");
+    if (result.emailSent) {
+      if (result.emailProvider === "console") {
+        toast.success("Invite created (email logged to console)", {
+          description: result.invite.inviteUrl,
+        });
+      } else {
+        toast.success("Invite sent by email");
+      }
+    } else {
+      toast.error("Invite created but email failed", {
+        description:
+          result.emailDetail || "Please copy the invite link manually.",
+      });
+    }
+
     setEmail("");
     setRole("EDITOR");
     setData((prev) =>

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { customAlphabet } from "nanoid";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { sendInviteEmail } from "@/lib/email";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -75,15 +76,31 @@ export async function POST(req: NextRequest) {
 
     const inviteUrl = `${process.env.NEXTAUTH_URL ?? ""}/auth/invite?token=${invite.token}`;
 
+    const workspace = await prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { name: true },
+    });
+
+    const emailResult = await sendInviteEmail({
+      to: parsed.email,
+      workspaceName: workspace?.name ?? "DocHub",
+      inviteUrl,
+      invitedByName: session.user.name,
+    });
+
     return NextResponse.json(
       {
         invite: {
           id: invite.id,
           email: invite.email,
           role: invite.role,
+          token: invite.token,
           expiresAt: invite.expiresAt,
           inviteUrl,
         },
+        emailSent: emailResult.ok,
+        emailProvider: emailResult.provider,
+        emailDetail: emailResult.detail,
       },
       { status: 201 },
     );

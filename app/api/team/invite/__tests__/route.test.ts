@@ -5,11 +5,13 @@ import { POST } from "../route";
 const {
   getServerSessionMock,
   userFindUniqueMock,
+  workspaceFindUniqueMock,
   inviteFindUniqueMock,
   inviteUpsertMock,
 } = vi.hoisted(() => ({
   getServerSessionMock: vi.fn(),
   userFindUniqueMock: vi.fn(),
+  workspaceFindUniqueMock: vi.fn(),
   inviteFindUniqueMock: vi.fn(),
   inviteUpsertMock: vi.fn(),
 }));
@@ -22,6 +24,9 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     user: {
       findUnique: userFindUniqueMock,
+    },
+    workspace: {
+      findUnique: workspaceFindUniqueMock,
     },
     workspaceInvite: {
       findUnique: inviteFindUniqueMock,
@@ -72,6 +77,7 @@ describe("POST /api/team/invite", () => {
     mockAdminSession();
     userFindUniqueMock.mockResolvedValue(null);
     inviteFindUniqueMock.mockResolvedValue(null);
+    workspaceFindUniqueMock.mockResolvedValue({ name: "Test Workspace" });
     inviteUpsertMock.mockResolvedValue({
       id: "invite-1",
       email: "new@example.com",
@@ -87,5 +93,6 @@ describe("POST /api/team/invite", () => {
     const json = await res.json();
     expect(json.invite.email).toBe("new@example.com");
     expect(json.invite.inviteUrl).toContain("token=secure-token-123");
+    expect(json.emailSent).toBe(true);
   });
 });
