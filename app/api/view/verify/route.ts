@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
 
     const clientIp = getClientIp(req);
     const rateLimitKey = `verify:${parsed.linkId}:${clientIp}`;
-    if (!isAllowed(rateLimitKey, VERIFY_RATE_LIMIT)) {
+    if (!(await isAllowed(rateLimitKey, VERIFY_RATE_LIMIT))) {
       return NextResponse.json(
         { error: "Too many attempts. Please try again later." },
         { status: 429 },
