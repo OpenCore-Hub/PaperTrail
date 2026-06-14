@@ -7,6 +7,7 @@ import {
   intervalToDuration,
 } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -24,6 +25,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { Download } from "lucide-react";
 
 interface AnalyticsDashboardProps {
   documentId: string;
@@ -91,11 +93,19 @@ export function AnalyticsDashboard({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold">{filename}</h2>
-        <p className="text-muted-foreground">
-          Document analytics and viewer activity
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold">{filename}</h2>
+          <p className="text-muted-foreground">
+            Document analytics and viewer activity
+          </p>
+        </div>
+        <Button variant="outline" asChild>
+          <a href={`/api/analytics/${documentId}/export`} download>
+            <Download className="mr-2 h-4 w-4" />
+            Export CSV
+          </a>
+        </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
