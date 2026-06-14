@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Playwright E2E test suite covering authentication and viewer access control.
 - PostgreSQL backup/restore scripts and Docker Compose backup sidecar.
 - Disaster recovery runbook (`docs/disaster-recovery.md`).
+- Go-live deployment commands and checklist (`docs/go-live-checklist.md`).
 - Vitest test framework and 51 automated tests covering auth, domains, email, rate limiting, invites, shares, documents, analytics, cron, password reset, viewer verify, and health.
 - GitHub pull request template.
 
