@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { authOptions } from "@/lib/auth";
 import { TeamManagement } from "@/components/team-management";
+import { CustomDomainManager } from "@/components/custom-domain-manager";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft } from "lucide-react";
 
 export default async function TeamSettingsPage() {
@@ -31,7 +33,18 @@ export default async function TeamSettingsPage() {
       </header>
 
       <main className="container mx-auto max-w-4xl px-4 py-8">
-        <TeamManagement />
+        <Tabs defaultValue="members">
+          <TabsList>
+            <TabsTrigger value="members">Members</TabsTrigger>
+            <TabsTrigger value="domain">Custom domain</TabsTrigger>
+          </TabsList>
+          <TabsContent value="members" className="mt-6">
+            <TeamManagement />
+          </TabsContent>
+          <TabsContent value="domain" className="mt-6">
+            <CustomDomainManager />
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );

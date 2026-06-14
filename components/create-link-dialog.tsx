@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ interface CreateLinkDialogProps {
 }
 
 export function CreateLinkDialog({ documentId }: CreateLinkDialogProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
@@ -28,7 +29,24 @@ export function CreateLinkDialog({ documentId }: CreateLinkDialogProps) {
   const [allowDownload, setAllowDownload] = useState(false);
   const [createdLink, setCreatedLink] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  const [baseUrl, setBaseUrl] = useState<string>("");
+
+  useEffect(() => {
+    fetch("/api/workspace")
+      .then((res) => res.json())
+      .then((data) => {
+        const domain: string | null = data.workspace?.customDomain;
+        const verified: boolean = data.workspace?.verified;
+        if (domain && verified) {
+          setBaseUrl(`https://${domain}`);
+        } else {
+          setBaseUrl(window.location.origin);
+        }
+      })
+      .catch(() => {
+        setBaseUrl(window.location.origin);
+      });
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -55,7 +73,8 @@ export function CreateLinkDialog({ documentId }: CreateLinkDialogProps) {
     }
 
     const data = await res.json();
-    const url = `${window.location.origin}/v/${data.slug}`;
+    const origin = baseUrl || window.location.origin;
+    const url = `${origin}/v/${data.slug}`;
     setCreatedLink(url);
     router.refresh();
   }

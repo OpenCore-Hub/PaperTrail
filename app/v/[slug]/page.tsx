@@ -1,18 +1,28 @@
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { ViewerGate } from "@/components/viewer-gate";
+import { resolveWorkspaceByHostname } from "@/lib/workspace-domain";
 
 interface ViewerPageProps {
   params: { slug: string };
 }
 
 export default async function ViewerPage({ params }: ViewerPageProps) {
+  const host = headers().get("host") ?? "";
+  const workspace = await resolveWorkspaceByHostname(host);
+
   const link = await prisma.shareLink.findUnique({
     where: { slug: params.slug },
     include: { document: true },
   });
 
   if (!link) {
+    notFound();
+  }
+
+  // When served via a custom domain, the link must belong to that workspace.
+  if (workspace && link.document.workspaceId !== workspace.id) {
     notFound();
   }
 
