@@ -125,6 +125,12 @@ export function ViewerGate({ link, filename }: ViewerGateProps) {
     if (!viewerSessionId) return;
 
     const heartbeat = setInterval(() => {
+      // Pause heartbeat when the tab is hidden to avoid inflating duration
+      // while the viewer is not actually looking at the document.
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
       fetch("/api/view", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
