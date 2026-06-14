@@ -31,6 +31,7 @@ export async function GET() {
         id: true,
         email: true,
         role: true,
+        token: true,
         expiresAt: true,
         createdAt: true,
       },

@@ -43,6 +43,7 @@ interface Invite {
   id: string;
   email: string;
   role: "ADMIN" | "EDITOR";
+  token: string;
   expiresAt: string;
   createdAt: string;
 }
@@ -192,7 +193,10 @@ export function TeamManagement() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleInvite} className="flex flex-col gap-4 sm:flex-row sm:items-end">
+          <form
+            onSubmit={handleInvite}
+            className="flex flex-col gap-4 sm:flex-row sm:items-end"
+          >
             <div className="flex-1 space-y-2">
               <Label htmlFor="invite-email">Email</Label>
               <Input
@@ -206,7 +210,10 @@ export function TeamManagement() {
             </div>
             <div className="w-full space-y-2 sm:w-40">
               <Label htmlFor="invite-role">Role</Label>
-              <Select value={role} onValueChange={(v) => setRole(v as "ADMIN" | "EDITOR")}>
+              <Select
+                value={role}
+                onValueChange={(v) => setRole(v as "ADMIN" | "EDITOR")}
+              >
                 <SelectTrigger id="invite-role">
                   <SelectValue />
                 </SelectTrigger>
@@ -216,7 +223,11 @@ export function TeamManagement() {
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit" disabled={inviting} className="w-full sm:w-auto">
+            <Button
+              type="submit"
+              disabled={inviting}
+              className="w-full sm:w-auto"
+            >
               <UserPlus className="mr-2 h-4 w-4" />
               {inviting ? "Sending…" : "Send invite"}
             </Button>
@@ -327,7 +338,11 @@ export function TeamManagement() {
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          onClick={() => copyInviteUrl(`${window.location.origin}/auth/invite?token=${invite.id}`)}
+                          onClick={() =>
+                            copyInviteUrl(
+                              `${window.location.origin}/auth/invite?token=${invite.token}`,
+                            )
+                          }
                           title="Copy invite link"
                         >
                           <Copy className="h-4 w-4" />
