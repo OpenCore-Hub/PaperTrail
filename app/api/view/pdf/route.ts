@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { pdfCache } from "@/lib/pdf-cache";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("api:view:pdf");
 
 export const dynamic = "force-dynamic";
+
+// How long the browser/CDN may cache a successfully authenticated PDF response.
+const CLIENT_CACHE_MAX_AGE_SECONDS = 60;
 
 export async function GET(req: NextRequest) {
   try {
@@ -43,35 +50,69 @@ export async function GET(req: NextRequest) {
     }
 
     const { document } = link;
+
+    // Check the server-side cache first to avoid repeated UploadThing fetches.
+    const cached = await pdfCache.get(document.storageKey);
+    if (cached) {
+      log.debug({ storageKey: document.storageKey }, "pdf.serve_from_cache");
+      const headers = new Headers();
+      headers.set("Content-Type", cached.metadata.contentType);
+      headers.set(
+        "Content-Disposition",
+        `${download ? "attachment" : "inline"}; filename="${cached.metadata.filename}"`,
+      );
+      headers.set(
+        "Cache-Control",
+        `private, max-age=${CLIENT_CACHE_MAX_AGE_SECONDS}`,
+      );
+      return new NextResponse(new Uint8Array(cached.buffer), {
+        status: 200,
+        headers,
+      });
+    }
+
     const fileUrl = `https://utfs.io/f/${document.storageKey}`;
 
     const upstream = await fetch(fileUrl);
     if (!upstream.ok) {
-      console.error("Failed to fetch PDF from storage", upstream.status);
+      log.error(
+        { storageKey: document.storageKey, status: upstream.status },
+        "pdf.upstream_fetch_failed",
+      );
       return NextResponse.json(
         { error: "Failed to load document" },
         { status: 502 },
       );
     }
 
+    const contentType =
+      upstream.headers.get("content-type") ?? "application/pdf";
+    const arrayBuffer = await upstream.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    await pdfCache.set(document.storageKey, buffer, {
+      filename: document.filename,
+      contentType,
+      size: buffer.length,
+    });
+
     const headers = new Headers();
-    headers.set("Content-Type", "application/pdf");
+    headers.set("Content-Type", contentType);
     headers.set(
       "Content-Disposition",
       `${download ? "attachment" : "inline"}; filename="${document.filename}"`,
     );
+    headers.set(
+      "Cache-Control",
+      `private, max-age=${CLIENT_CACHE_MAX_AGE_SECONDS}`,
+    );
 
-    const cacheControl = upstream.headers.get("cache-control");
-    if (cacheControl) {
-      headers.set("Cache-Control", cacheControl);
-    }
-
-    return new NextResponse(upstream.body, {
+    return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers,
     });
   } catch (error) {
-    console.error("PDF proxy error:", error);
+    log.error({ error }, "pdf.serve_failed");
     return NextResponse.json(
       { error: "Failed to serve document" },
       { status: 500 },

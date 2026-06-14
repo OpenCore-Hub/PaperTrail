@@ -109,7 +109,7 @@ export function ManageLinksDialog({ documentId }: ManageLinksDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" data-testid="manage-links-button">
           <Link2 className="mr-1 h-4 w-4" />
           Manage links
         </Button>

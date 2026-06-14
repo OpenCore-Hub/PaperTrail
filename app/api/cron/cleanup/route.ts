@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { pdfCache } from "@/lib/pdf-cache";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger("api:cron:cleanup");
@@ -86,11 +87,14 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    const pdfCacheCleanup = await pdfCache.cleanup();
+
     return NextResponse.json({
       ok: true,
       deletedExpiredLinks: expiredLinksResult.count,
       closedStaleSessions: closedStaleSessionsResult.count,
       deletedOldSessions: oldSessionsResult.count,
+      deletedPdfCacheEntries: pdfCacheCleanup.deleted,
     });
   } catch (error) {
     log.error({ error }, "cleanup.failed");

@@ -6,10 +6,12 @@ const {
   shareLinkDeleteManyMock,
   viewSessionUpdateManyMock,
   viewSessionDeleteManyMock,
+  pdfCacheCleanupMock,
 } = vi.hoisted(() => ({
   shareLinkDeleteManyMock: vi.fn(),
   viewSessionUpdateManyMock: vi.fn(),
   viewSessionDeleteManyMock: vi.fn(),
+  pdfCacheCleanupMock: vi.fn(),
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -21,6 +23,12 @@ vi.mock("@/lib/prisma", () => ({
       updateMany: viewSessionUpdateManyMock,
       deleteMany: viewSessionDeleteManyMock,
     },
+  },
+}));
+
+vi.mock("@/lib/pdf-cache", () => ({
+  pdfCache: {
+    cleanup: pdfCacheCleanupMock,
   },
 }));
 
@@ -55,11 +63,12 @@ describe("GET /api/cron/cleanup", () => {
     expect(res.status).toBe(401);
   });
 
-  it("deletes expired links, closes stale sessions, and deletes old sessions when authenticated", async () => {
+  it("deletes expired links, closes stale sessions, deletes old sessions, and cleans PDF cache when authenticated", async () => {
     process.env.CRON_SECRET = "secret";
     shareLinkDeleteManyMock.mockResolvedValue({ count: 5 });
     viewSessionUpdateManyMock.mockResolvedValue({ count: 3 });
     viewSessionDeleteManyMock.mockResolvedValue({ count: 12 });
+    pdfCacheCleanupMock.mockResolvedValue({ deleted: 2 });
 
     const res = await GET(makeRequest("Bearer secret"));
     expect(res.status).toBe(200);
@@ -68,6 +77,7 @@ describe("GET /api/cron/cleanup", () => {
     expect(json.deletedExpiredLinks).toBe(5);
     expect(json.closedStaleSessions).toBe(3);
     expect(json.deletedOldSessions).toBe(12);
+    expect(json.deletedPdfCacheEntries).toBe(2);
 
     expect(shareLinkDeleteManyMock).toHaveBeenCalledWith({
       where: {
@@ -88,5 +98,6 @@ describe("GET /api/cron/cleanup", () => {
         startedAt: { lt: expect.any(Date) },
       },
     });
+    expect(pdfCacheCleanupMock).toHaveBeenCalled();
   });
 });
