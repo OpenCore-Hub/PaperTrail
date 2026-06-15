@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Document persistence refactor (ISSUE-001)**:
+  - Storage abstraction layer (`IStorageProvider`, `UploadThingStorageProvider`, factory) with unit tests.
+  - `DocumentVersion` model plus `StorageType` and `AiIndexStatus` enums; backfill migration for existing documents.
+  - Upload, viewer, delete, and dashboard flows now read/write through `DocumentVersion`.
+  - Version management API: `GET/POST /api/documents/[id]/versions` and `POST /api/documents/[id]/versions/[versionId]/set-latest`.
+  - Structured audit logging helper (`lib/audit.ts`) wired to version lifecycle events.
 - Structured JSON logging via Pino (`lib/logger.ts`) for production observability.
 - Sentry PII scrubbing (`token` query param) and release/environment configuration.
 - New E2E tests for analytics dashboard (`e2e/analytics.spec.ts`) and team invitation flow (`e2e/team.spec.ts`).
