@@ -5,13 +5,15 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createLogger } from "@/lib/logger";
 import { checkAiQueryAllowed } from "@/lib/ai/rate-limit";
-import { askDocumentQuestion } from "@/lib/ai/query";
+import { askDataroomQuestion } from "@/lib/ai/dataroom-chat";
+import { isDataroomIntelligenceAllowed } from "@/lib/plans";
 
-const log = createLogger("api:documents:chat");
+const log = createLogger("api:datarooms:chat");
 
 const chatBodySchema = z.object({
   question: z.string().min(1).max(4000),
   conversationId: z.string().uuid().optional(),
+  documentIds: z.array(z.string().uuid()).max(50).optional(),
 });
 
 export const dynamic = "force-dynamic";
@@ -22,18 +24,18 @@ interface ResolvedAuth {
 }
 
 /**
- * GET /api/documents/[id]/chat?conversationId=<uuid>
+ * GET /api/datarooms/[id]/chat?conversationId=<uuid>
  *
- * Load persisted messages for a document-scoped AI conversation.
+ * Load persisted messages for a dataroom-scoped AI conversation.
  */
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const documentId = params.id;
+  const dataroomId = params.id;
 
   try {
-    const auth = await resolveAuth(req, documentId);
+    const auth = await resolveAuth(req, dataroomId);
     if (!auth) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -46,8 +48,8 @@ export async function GET(
     const conversation = await prisma.aiConversation.findFirst({
       where: {
         id: conversationId,
-        scopeType: "DOCUMENT",
-        scopeId: documentId,
+        scopeType: "DATAROOM",
+        scopeId: dataroomId,
       },
       include: {
         messages: {
@@ -77,7 +79,7 @@ export async function GET(
     });
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
-    log.error({ documentId, error: err.message }, "chat.get_failed");
+    log.error({ dataroomId, error: err.message }, "chat.get_failed");
     return NextResponse.json(
       { error: "Failed to load chat history" },
       { status: 500 },
@@ -86,16 +88,17 @@ export async function GET(
 }
 
 /**
- * POST /api/documents/[id]/chat
+ * POST /api/datarooms/[id]/chat
  *
- * Ask an AI question against a document. Accepts either an authenticated
- * workspace session or a valid viewer grant token.
+ * Ask an AI question across the documents in a dataroom. Accepts either an
+ * authenticated workspace session or a valid viewer grant token for a share
+ * link scoped to this dataroom.
  */
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const documentId = params.id;
+  const dataroomId = params.id;
 
   try {
     const body = await req.json();
@@ -107,13 +110,25 @@ export async function POST(
       );
     }
 
-    const { question, conversationId } = parsed.data;
+    const { question, conversationId, documentIds } = parsed.data;
 
-    const auth = await resolveAuth(req, documentId);
+    const auth = await resolveAuth(req, dataroomId);
     if (!auth) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const { userId, workspaceId } = auth;
+
+    const workspace = await prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { plan: true },
+    });
+
+    if (!workspace || !isDataroomIntelligenceAllowed(workspace.plan)) {
+      return NextResponse.json(
+        { error: "Dataroom intelligence is not available on the free plan" },
+        { status: 403 },
+      );
+    }
 
     const allowed = await checkAiQueryAllowed(workspaceId);
     if (!allowed) {
@@ -123,36 +138,13 @@ export async function POST(
       );
     }
 
-    const document = await prisma.document.findFirst({
-      where: { id: documentId, workspaceId },
-    });
-    if (!document) {
-      return NextResponse.json(
-        { error: "Document not found" },
-        { status: 404 },
-      );
-    }
-
-    const readyVersion = await prisma.documentVersion.findFirst({
-      where: { documentId, aiStatus: "READY" },
-      orderBy: { versionNumber: "desc" },
-    });
-    if (!readyVersion) {
-      return NextResponse.json(
-        {
-          error:
-            "Document is not yet indexed for AI. Please try again in a moment.",
-        },
-        { status: 503 },
-      );
-    }
-
-    const result = await askDocumentQuestion({
-      documentId,
+    const result = await askDataroomQuestion({
+      dataroomId,
       workspaceId,
       userId,
       question,
       conversationId,
+      documentIds,
     });
 
     return NextResponse.json({
@@ -163,13 +155,17 @@ export async function POST(
     });
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
-    log.error({ documentId, error: err.message }, "chat.query_failed");
+    log.error({ dataroomId, error: err.message }, "chat.query_failed");
 
-    if (err.message.includes("no AI-ready version")) {
+    if (
+      err.message.includes("no AI-ready documents") ||
+      err.message.includes("documents without AI-ready versions") ||
+      err.message.includes("no indexed chunks")
+    ) {
       return NextResponse.json(
         {
           error:
-            "Document is not yet indexed for AI. Please try again in a moment.",
+            "Dataroom documents are not yet indexed for AI. Please try again in a moment.",
         },
         { status: 503 },
       );
@@ -184,14 +180,14 @@ export async function POST(
 
 async function resolveAuth(
   req: NextRequest,
-  documentId: string,
+  dataroomId: string,
 ): Promise<ResolvedAuth | null> {
   const session = await getServerSession(authOptions);
   if (session?.user?.workspaceId) {
-    const document = await prisma.document.findFirst({
-      where: { id: documentId, workspaceId: session.user.workspaceId },
+    const dataroom = await prisma.dataroom.findFirst({
+      where: { id: dataroomId, workspaceId: session.user.workspaceId },
     });
-    if (document) {
+    if (dataroom) {
       return {
         userId: session.user.id,
         workspaceId: session.user.workspaceId,
@@ -203,18 +199,26 @@ async function resolveAuth(
   if (viewerToken) {
     const grant = await prisma.viewerGrant.findUnique({
       where: { token: viewerToken },
-      include: { link: { include: { document: true } } },
+      include: {
+        link: {
+          include: {
+            dataroom: {
+              select: { id: true, workspaceId: true },
+            },
+          },
+        },
+      },
     });
 
     if (
       grant &&
       grant.expiresAt > new Date() &&
-      grant.link.document &&
-      grant.link.document.id === documentId
+      grant.link.dataroom &&
+      grant.link.dataroom.id === dataroomId
     ) {
       return {
         userId: `viewer:${grant.id}`,
-        workspaceId: grant.link.document.workspaceId,
+        workspaceId: grant.link.dataroom.workspaceId,
       };
     }
   }

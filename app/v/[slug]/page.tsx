@@ -17,7 +17,7 @@ export default async function ViewerPage({ params }: ViewerPageProps) {
     include: { document: true },
   });
 
-  if (!link) {
+  if (!link || !link.document) {
     notFound();
   }
 

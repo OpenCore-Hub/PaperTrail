@@ -20,6 +20,7 @@ model Workspace {
   users         User[]
   invites       WorkspaceInvite[]
   documents     Document[]
+  datarooms     Dataroom[]
   aiProviderConfig AiProviderConfig?
 
   @@map("workspaces")
@@ -55,6 +56,7 @@ model User {
   documents     Document[]
   versions      DocumentVersion[]
   passwordResetTokens PasswordResetToken[]
+  dataroomPermissions DataroomPermission[]
 
   @@map("users")
 }
@@ -78,6 +80,12 @@ enum UserRole {
   VIEWER
 }
 
+enum DataroomRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
 model Document {
   id            String    @id @default(uuid())
   workspaceId   String    @map("workspace_id")
@@ -92,6 +100,7 @@ model Document {
   workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   uploader      User      @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
   links         ShareLink[]
+  dataroomDocuments DataroomDocument[]
   versions      DocumentVersion[]
 
   @@map("documents")
@@ -209,9 +218,80 @@ model AiMessage {
   @@map("ai_messages")
 }
 
+model Dataroom {
+  id            String            @id @default(uuid())
+  workspaceId   String            @map("workspace_id")
+  name          String
+  description   String?
+  brand         Json?
+  customDomain  String?           @unique @map("custom_domain")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  workspace     Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  folders       DataroomFolder[]
+  documents     DataroomDocument[]
+  permissions   DataroomPermission[]
+  shareLinks    ShareLink[]
+
+  @@index([workspaceId])
+  @@map("datarooms")
+}
+
+model DataroomFolder {
+  id            String    @id @default(uuid())
+  dataroomId    String    @map("dataroom_id")
+  parentId      String?   @map("parent_id")
+  name          String
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  dataroom      Dataroom  @relation(fields: [dataroomId], references: [id], onDelete: Cascade)
+  parent        DataroomFolder? @relation("FolderChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children      DataroomFolder[] @relation("FolderChildren")
+  documents     DataroomDocument[]
+
+  @@index([dataroomId])
+  @@index([parentId])
+  @@map("dataroom_folders")
+}
+
+model DataroomDocument {
+  id            String    @id @default(uuid())
+  dataroomId    String    @map("dataroom_id")
+  folderId      String?   @map("folder_id")
+  documentId    String    @map("document_id")
+  order         Int       @default(0)
+  addedAt       DateTime  @default(now()) @map("added_at")
+
+  dataroom      Dataroom  @relation(fields: [dataroomId], references: [id], onDelete: Cascade)
+  folder        DataroomFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  document      Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([dataroomId, documentId])
+  @@index([dataroomId])
+  @@index([folderId])
+  @@map("dataroom_documents")
+}
+
+model DataroomPermission {
+  id            String        @id @default(uuid())
+  dataroomId    String        @map("dataroom_id")
+  userId        String?       @map("user_id")
+  role          DataroomRole  @default(VIEWER)
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  dataroom      Dataroom      @relation(fields: [dataroomId], references: [id], onDelete: Cascade)
+  user          User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([dataroomId, userId])
+  @@index([dataroomId])
+  @@map("dataroom_permissions")
+}
+
 model ShareLink {
   id              String    @id @default(uuid())
-  documentId      String    @map("document_id")
+  documentId      String?   @map("document_id")
+  dataroomId      String?   @map("dataroom_id")
   slug            String    @unique
   passwordHash    String?   @map("password_hash")
   expiresAt       DateTime? @map("expires_at")
@@ -220,11 +300,13 @@ model ShareLink {
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  document        Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document        Document? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  dataroom        Dataroom? @relation(fields: [dataroomId], references: [id], onDelete: Cascade)
   sessions        ViewSession[]
   viewerGrants    ViewerGrant[]
 
   @@index([documentId])
+  @@index([dataroomId])
   @@map("share_links")
 }
 

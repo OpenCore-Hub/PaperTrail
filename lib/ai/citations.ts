@@ -2,6 +2,8 @@ export interface Citation {
   pageNumber: number;
   chunkId: string;
   excerpt: string;
+  documentId?: string;
+  documentName?: string;
 }
 
 const CITATION_PATTERN = /\[citation:\s?([a-f0-9-]{36})\]/g;
@@ -17,7 +19,13 @@ const MAX_CITATIONS = 8;
  */
 export function extractCitations(
   answer: string,
-  availableChunks: Array<{ id: string; pageNumber: number; excerpt: string }>,
+  availableChunks: Array<{
+    id: string;
+    pageNumber: number;
+    excerpt: string;
+    documentId?: string;
+    documentName?: string;
+  }>,
 ): Citation[] {
   const chunkMap = new Map(availableChunks.map((c) => [c.id, c]));
   const seen = new Set<string>();
@@ -42,6 +50,10 @@ export function extractCitations(
       chunkId,
       pageNumber: chunk.pageNumber,
       excerpt: chunk.excerpt,
+      ...(chunk.documentId !== undefined && { documentId: chunk.documentId }),
+      ...(chunk.documentName !== undefined && {
+        documentName: chunk.documentName,
+      }),
     });
 
     if (citations.length >= MAX_CITATIONS) break;

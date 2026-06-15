@@ -30,3 +30,11 @@ export function canManageDocuments(role: UserRole): boolean {
 export function canManageWorkspace(role: UserRole): boolean {
   return role === UserRole.ADMIN;
 }
+
+/**
+ * Roles that can mutate dataroom structure (create, update, mount documents,
+ * manage folders).
+ */
+export function canManageDataroom(role: UserRole): boolean {
+  return role === UserRole.ADMIN || role === UserRole.EDITOR;
+}
