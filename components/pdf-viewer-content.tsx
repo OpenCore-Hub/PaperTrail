@@ -1,12 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { cn } from "@/lib/utils";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+
+export interface PdfViewerHandle {
+  /**
+   * Scroll the viewer to the requested page and briefly highlight it.
+   */
+  scrollToPage(pageNumber: number): void;
+}
 
 interface PdfViewerContentProps {
   pdfUrl: string;
@@ -15,12 +29,13 @@ interface PdfViewerContentProps {
   filename?: string;
 }
 
-export function PdfViewerContent({
-  pdfUrl,
-  sessionId,
-  allowDownload,
-  filename,
-}: PdfViewerContentProps) {
+export const PdfViewerContent = forwardRef<
+  PdfViewerHandle,
+  PdfViewerContentProps
+>(function PdfViewerContent(
+  { pdfUrl, sessionId, allowDownload, filename },
+  ref,
+) {
   const [numPages, setNumPages] = useState<number>(0);
   const [pageVisibility, setPageVisibility] = useState<Record<number, boolean>>(
     {},
@@ -28,6 +43,20 @@ export function PdfViewerContent({
   const visibilityRef = useRef<Record<number, boolean>>({});
   const enteredAtRef = useRef<Record<number, number>>({});
   const reportedRef = useRef<Set<number>>(new Set());
+
+  useImperativeHandle(ref, () => ({
+    scrollToPage(pageNumber: number) {
+      const selector = `[data-page-number="${pageNumber}"]`;
+      const element = document.querySelector(selector);
+      if (!(element instanceof HTMLElement)) return;
+
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+      element.classList.add("ring-2", "ring-primary", "ring-offset-2");
+      window.setTimeout(() => {
+        element.classList.remove("ring-2", "ring-primary", "ring-offset-2");
+      }, 2000);
+    },
+  }));
 
   const reportPageView = useCallback(
     async (pageNumber: number, durationMs: number) => {
@@ -141,4 +170,6 @@ export function PdfViewerContent({
       </Document>
     </div>
   );
-}
+});
+
+PdfViewerContent.displayName = "PdfViewerContent";
