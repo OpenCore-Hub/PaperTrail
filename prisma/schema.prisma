@@ -52,6 +52,7 @@ model User {
 
   workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   documents     Document[]
+  versions      DocumentVersion[]
   passwordResetTokens PasswordResetToken[]
 
   @@map("users")
@@ -81,17 +82,52 @@ model Document {
   workspaceId   String    @map("workspace_id")
   uploadedBy    String    @map("uploaded_by")
   filename      String
-  storageKey    String    @map("storage_key")
-  fileSize      Int       @map("file_size")
-  pageCount     Int       @default(0) @map("page_count")
+  storageKey    String?   @map("storage_key")
+  fileSize      Int?      @map("file_size")
+  pageCount     Int?      @default(0) @map("page_count")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
   workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   uploader      User      @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
   links         ShareLink[]
+  versions      DocumentVersion[]
 
   @@map("documents")
+}
+
+model DocumentVersion {
+  id            String        @id @default(uuid())
+  documentId    String        @map("document_id")
+  versionNumber Int           @map("version_number")
+  storageKey    String        @map("storage_key")
+  storageType   StorageType   @default(UPLOADTHING) @map("storage_type")
+  fileSize      Int           @map("file_size")
+  pageCount     Int           @default(0) @map("page_count")
+  contentType   String        @map("content_type")
+  aiStatus      AiIndexStatus @default(PENDING) @map("ai_status")
+  createdBy     String        @map("created_by")
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  document      Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  creator       User          @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, versionNumber])
+  @@index([documentId, versionNumber])
+  @@map("document_versions")
+}
+
+enum StorageType {
+  UPLOADTHING
+  S3
+  LOCAL
+}
+
+enum AiIndexStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
 }
 
 model ShareLink {
