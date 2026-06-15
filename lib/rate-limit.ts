@@ -17,7 +17,7 @@ const buckets = new Map<string, BucketEntry>();
 let redisClient: Redis | null = null;
 let redisChecked = false;
 
-function getRedisClient(): Redis | null {
+export function getRedisClient(): Redis | null {
   if (redisChecked) return redisClient;
   redisChecked = true;
 

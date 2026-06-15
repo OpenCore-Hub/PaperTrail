@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { generateWorkspaceSlug } from "@/lib/slug";
 import { enforceRateLimit, RateLimits } from "@/lib/rate-limit";
 import { sendVerificationEmail } from "@/lib/email";
+import { verifyHcaptchaToken } from "@/lib/hcaptcha";
 import { createLogger } from "@/lib/logger";
 import { z } from "zod";
 
@@ -17,6 +18,7 @@ const signupSchema = z.object({
   workspaceName: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(8),
+  captchaToken: z.string().min(1),
 });
 
 // 24-hour verification token
@@ -31,6 +33,14 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const parsed = signupSchema.parse(body);
+
+    const captchaValid = await verifyHcaptchaToken(parsed.captchaToken);
+    if (!captchaValid) {
+      return NextResponse.json(
+        { error: "Captcha verification failed" },
+        { status: 400 },
+      );
+    }
 
     const existing = await prisma.user.findUnique({
       where: { email: parsed.email },

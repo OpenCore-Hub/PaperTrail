@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { getCsrfToken, signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -10,11 +11,20 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 
+const HCaptchaWidget = dynamic(() => import("@hcaptcha/react-hcaptcha"), {
+  ssr: false,
+});
+
+const HCAPTCHA_SITEKEY = process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY;
+
 function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [captchaToken, setCaptchaToken] = useState<string | null>(
+    HCAPTCHA_SITEKEY ? null : "dev",
+  );
   const [loading, setLoading] = useState(false);
   const [csrfToken, setCsrfToken] = useState<string>("");
 
@@ -26,10 +36,23 @@ function SignInForm() {
     if (searchParams.get("verified") === "1") {
       toast.success("Email verified. You can now sign in.");
     }
+
+    const error = searchParams.get("error");
+    if (error === "LockedOut") {
+      toast.error(
+        "Account temporarily locked due to too many failed attempts. Please try again later.",
+      );
+    }
   }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!captchaToken) {
+      toast.error("Please complete the captcha");
+      return;
+    }
+
     setLoading(true);
 
     // Ensure we have a CSRF token even if the initial fetch hasn't completed
@@ -40,11 +63,14 @@ function SignInForm() {
       csrfToken: token,
       email,
       password,
+      captchaToken,
       redirect: false,
     });
     setLoading(false);
 
     if (result?.error) {
+      setCaptchaToken(HCAPTCHA_SITEKEY ? null : "dev");
+
       if (result.error === "AccessDenied") {
         toast.error("Please verify your email before signing in.");
       } else {
@@ -85,6 +111,17 @@ function SignInForm() {
                 required
               />
             </div>
+
+            {HCAPTCHA_SITEKEY && (
+              <div className="flex justify-center">
+                <HCaptchaWidget
+                  sitekey={HCAPTCHA_SITEKEY}
+                  onVerify={(token) => setCaptchaToken(token)}
+                  onExpire={() => setCaptchaToken(null)}
+                />
+              </div>
+            )}
+
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Signing in..." : "Sign in"}
             </Button>

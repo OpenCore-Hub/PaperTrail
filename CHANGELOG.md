@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Custom domain periodic re-verification**: DNS is re-checked on every viewer-page request served via a custom domain, and the cleanup cron revokes verification for domains that no longer point to the application.
 - Signup route tests including rate-limit behavior (`app/api/auth/signup/__tests__/route.test.ts`).
 - **Email verification for password sign-ups**: new `email_verified` column and `email_verification_tokens` table; signup sends a 24-hour verification link via Resend; unverified credentials cannot sign in; Google sign-ins are automatically verified; verification and resend endpoints with rate limiting and tests.
+- **Account lockout + hCaptcha on credentials auth**: accounts are temporarily locked after 5 failed login attempts within 15 minutes; sign-in and sign-up forms require hCaptcha verification; Redis-backed with in-memory fallback.
+- **Prisma connection pool tuning**: `lib/prisma.ts` now defaults `connection_limit=20` and `pool_timeout=10` on `DATABASE_URL` unless already specified.
+- **Graceful shutdown**: `instrumentation.ts` registers SIGTERM/SIGINT handlers that close the Redis connection and disconnect Prisma within a 10-second timeout; `/api/health` returns 503 while shutting down.
+- **GDPR data export and account deletion**: new `/api/user/export` and `/api/user/delete` endpoints plus `/dashboard/settings/account` UI for users to download their data or delete their account after password confirmation.
+- **Self-hosted PDF.js worker**: the viewer no longer loads the worker from cdnjs; `public/pdf.worker.min.mjs` is copied from `pdfjs-dist` via a `postinstall` script and served locally. Removed cdnjs from the CSP `script-src`.
 
 ### Changed
 

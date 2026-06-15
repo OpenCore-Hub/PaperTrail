@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -10,28 +11,50 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 
+const HCaptchaWidget = dynamic(() => import("@hcaptcha/react-hcaptcha"), {
+  ssr: false,
+});
+
+const HCAPTCHA_SITEKEY = process.env.NEXT_PUBLIC_HCAPTCHA_SITEKEY;
+
 export default function SignUpPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [workspaceName, setWorkspaceName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [captchaToken, setCaptchaToken] = useState<string | null>(
+    HCAPTCHA_SITEKEY ? null : "dev",
+  );
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!captchaToken) {
+      toast.error("Please complete the captcha");
+      return;
+    }
+
     setLoading(true);
     const res = await fetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, workspaceName, email, password }),
+      body: JSON.stringify({
+        name,
+        workspaceName,
+        email,
+        password,
+        captchaToken,
+      }),
     });
     setLoading(false);
 
     if (!res.ok) {
       const data = await res.json();
       toast.error(data.error || "Failed to create account");
+      setCaptchaToken(HCAPTCHA_SITEKEY ? null : "dev");
       return;
     }
 
@@ -110,6 +133,17 @@ export default function SignUpPage() {
                 required
               />
             </div>
+
+            {HCAPTCHA_SITEKEY && (
+              <div className="flex justify-center">
+                <HCaptchaWidget
+                  sitekey={HCAPTCHA_SITEKEY}
+                  onVerify={(token) => setCaptchaToken(token)}
+                  onExpire={() => setCaptchaToken(null)}
+                />
+              </div>
+            )}
+
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Creating..." : "Create workspace"}
             </Button>

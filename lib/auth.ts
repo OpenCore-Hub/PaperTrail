@@ -1,10 +1,16 @@
-import { NextAuthOptions, type Session } from "next-auth";
+import { NextAuthOptions, type Session, type User } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 import { generateWorkspaceSlug } from "./slug";
 import { UserRole } from "./roles";
+import {
+  isLoginAllowed,
+  recordFailedLogin,
+  clearFailedLogins,
+} from "./account-lockout";
+import { verifyHcaptchaToken } from "./hcaptcha";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -15,21 +21,52 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+        const creds = credentials as
+          | {
+              email?: string;
+              password?: string;
+              captchaToken?: string;
+            }
+          | undefined;
+
+        if (!creds?.email || !creds?.password) return null;
+
+        // Enforce hCaptcha on credentials sign-in.
+        if (
+          !creds.captchaToken ||
+          !(await verifyHcaptchaToken(creds.captchaToken))
+        ) {
+          return null;
+        }
+
+        // Check account lockout before spending time on bcrypt.
+        const lockStatus = await isLoginAllowed(creds.email);
+        if (!lockStatus.allowed) {
+          return {
+            id: "locked",
+            email: creds.email,
+            locked: true,
+          } as User;
+        }
 
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          where: { email: creds.email },
           include: { workspace: true },
         });
 
-        if (!user || !user.password) return null;
+        if (!user || !user.password) {
+          await recordFailedLogin(creds.email);
+          return null;
+        }
 
-        const isValid = await bcrypt.compare(
-          credentials.password,
-          user.password,
-        );
+        const isValid = await bcrypt.compare(creds.password, user.password);
 
-        if (!isValid) return null;
+        if (!isValid) {
+          await recordFailedLogin(creds.email);
+          return null;
+        }
+
+        await clearFailedLogins(creds.email);
 
         return {
           id: user.id,
@@ -100,6 +137,11 @@ export const authOptions: NextAuthOptions = {
           user.sessionVersion = existing.sessionVersion;
           user.emailVerified = existing.emailVerified ?? new Date();
         }
+      }
+
+      // Account lockout surfaced as a dedicated error page.
+      if (user.locked) {
+        return `/auth/signin?error=LockedOut`;
       }
 
       // Credentials users must verify their email before signing in.

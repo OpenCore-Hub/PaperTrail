@@ -7,7 +7,7 @@ import { DocumentList } from "@/components/document-list";
 import { UploadDocument } from "@/components/upload-document";
 import { SignOutButton } from "@/components/sign-out-button";
 import { Button } from "@/components/ui/button";
-import { Settings } from "lucide-react";
+import { Settings, User } from "lucide-react";
 import { canManageDocuments, canManageWorkspace } from "@/lib/roles";
 
 export default async function DashboardPage() {
@@ -43,6 +43,12 @@ export default async function DashboardPage() {
                 </Link>
               </Button>
             )}
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/dashboard/settings/account">
+                <User className="mr-1 h-4 w-4" />
+                Account
+              </Link>
+            </Button>
             <SignOutButton />
           </div>
         </div>

@@ -16,6 +16,7 @@ declare module "next-auth" {
     role?: UserRole;
     sessionVersion?: number;
     emailVerified?: Date | null;
+    locked?: boolean;
   }
 }
 

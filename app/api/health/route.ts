@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createLogger } from "@/lib/logger";
+import { isShuttingDown } from "@/lib/shutdown";
 import { healthCheckCounter, withMetrics } from "@/lib/metrics";
 
 const log = createLogger("api:health");
@@ -40,6 +41,13 @@ async function checkStorage(): Promise<HealthCheck> {
 }
 
 async function handler() {
+  if (isShuttingDown()) {
+    return NextResponse.json(
+      { status: "shutting_down", checks: {} },
+      { status: 503 },
+    );
+  }
+
   const checks = await Promise.all([checkDatabase(), checkStorage()]);
   const healthy = checks.every((c) => c.status === "ok");
 

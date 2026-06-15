@@ -10,6 +10,7 @@ const {
   workspaceDeleteMock,
   emailVerificationTokenCreateMock,
   sendVerificationEmailMock,
+  verifyHcaptchaTokenMock,
 } = vi.hoisted(() => ({
   userFindUniqueMock: vi.fn(),
   workspaceCreateMock: vi.fn(),
@@ -17,6 +18,7 @@ const {
   workspaceDeleteMock: vi.fn(),
   emailVerificationTokenCreateMock: vi.fn(),
   sendVerificationEmailMock: vi.fn(),
+  verifyHcaptchaTokenMock: vi.fn(),
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -39,6 +41,10 @@ vi.mock("@/lib/email", () => ({
   sendVerificationEmail: sendVerificationEmailMock,
 }));
 
+vi.mock("@/lib/hcaptcha", () => ({
+  verifyHcaptchaToken: verifyHcaptchaTokenMock,
+}));
+
 function makeRequest(body: object): NextRequest {
   return new NextRequest("http://localhost:3000/api/auth/signup", {
     method: "POST",
@@ -55,6 +61,7 @@ const validBody = {
   workspaceName: "Test Workspace",
   email: "new@example.com",
   password: "password123",
+  captchaToken: "captcha-token",
 };
 
 describe("POST /api/auth/signup", () => {
@@ -65,6 +72,7 @@ describe("POST /api/auth/signup", () => {
       ok: true,
       provider: "console",
     });
+    verifyHcaptchaTokenMock.mockResolvedValue(true);
   });
 
   it("creates a workspace and user for a new email", async () => {
@@ -121,6 +129,14 @@ describe("POST /api/auth/signup", () => {
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(500);
     expect(workspaceDeleteMock).toHaveBeenCalledWith({ where: { id: "ws-1" } });
+  });
+
+  it("returns 400 when the captcha token is invalid", async () => {
+    verifyHcaptchaTokenMock.mockResolvedValue(false);
+
+    const res = await POST(makeRequest(validBody));
+    expect(res.status).toBe(400);
+    expect(userCreateMock).not.toHaveBeenCalled();
   });
 
   it("returns 400 for invalid input", async () => {
