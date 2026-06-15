@@ -17,6 +17,7 @@ export default function SignUpPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -34,8 +35,33 @@ export default function SignUpPage() {
       return;
     }
 
-    toast.success("Account created. Please sign in.");
-    router.push("/auth/signin");
+    setSent(true);
+  }
+
+  if (sent) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Verify your email</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              We sent a verification link to{" "}
+              <span className="font-medium text-foreground">{email}</span>.
+              Please click it to activate your account.
+            </p>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => router.push("/auth/verify-email")}
+            >
+              Didn&apos;t receive it?
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (

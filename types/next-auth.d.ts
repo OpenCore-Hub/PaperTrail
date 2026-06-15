@@ -15,6 +15,7 @@ declare module "next-auth" {
     workspaceId?: string;
     role?: UserRole;
     sessionVersion?: number;
+    emailVerified?: Date | null;
   }
 }
 
@@ -24,5 +25,6 @@ declare module "next-auth/jwt" {
     workspaceId?: string;
     role?: UserRole;
     sessionVersion?: number;
+    emailVerified?: Date | null;
   }
 }

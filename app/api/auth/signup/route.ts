@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { customAlphabet } from "nanoid";
 import { prisma } from "@/lib/prisma";
 import { generateWorkspaceSlug } from "@/lib/slug";
 import { enforceRateLimit, RateLimits } from "@/lib/rate-limit";
+import { sendVerificationEmail } from "@/lib/email";
 import { createLogger } from "@/lib/logger";
 import { z } from "zod";
 
@@ -16,6 +18,9 @@ const signupSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
 });
+
+// 24-hour verification token
+const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 
 export async function POST(req: NextRequest) {
   const rateLimit = await enforceRateLimit(req, "auth:signup", RateLimits.auth);
@@ -57,7 +62,47 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true }, { status: 201 });
+    const token = customAlphabet(
+      "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_",
+      32,
+    )();
+    const expiresAt = new Date(Date.now() + VERIFICATION_TTL_MS);
+
+    await prisma.emailVerificationToken.create({
+      data: {
+        email: parsed.email,
+        token,
+        expiresAt,
+      },
+    });
+
+    const verifyUrl = `${process.env.NEXTAUTH_URL ?? ""}/auth/verify-email?token=${token}`;
+    const sendResult = await sendVerificationEmail({
+      to: parsed.email,
+      verifyUrl,
+    });
+
+    if (!sendResult.ok) {
+      // Roll back the created workspace/user so the signup can be retried once
+      // the email provider is healthy.
+      await prisma.workspace.delete({ where: { id: workspace.id } });
+      log.error(
+        { email: parsed.email, detail: sendResult.detail },
+        "auth.signup_verification_email_failed",
+      );
+      return NextResponse.json(
+        { error: "Failed to send verification email. Please try again later." },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Please check your email to verify your account.",
+      },
+      { status: 201 },
+    );
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

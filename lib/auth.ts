@@ -38,6 +38,7 @@ export const authOptions: NextAuthOptions = {
           workspaceId: user.workspaceId,
           role: user.role,
           sessionVersion: user.sessionVersion,
+          emailVerified: user.emailVerified,
         };
       },
     }),
@@ -75,6 +76,7 @@ export const authOptions: NextAuthOptions = {
               name: user.name,
               role: "ADMIN",
               workspaceId: workspace.id,
+              emailVerified: new Date(),
             },
           });
 
@@ -82,13 +84,29 @@ export const authOptions: NextAuthOptions = {
           user.workspaceId = created.workspaceId;
           user.role = created.role;
           user.sessionVersion = created.sessionVersion;
+          user.emailVerified = created.emailVerified;
         } else {
+          // Trust Google as a verified email source and backfill legacy users.
+          if (!existing.emailVerified) {
+            await prisma.user.update({
+              where: { id: existing.id },
+              data: { emailVerified: new Date() },
+            });
+          }
+
           user.id = existing.id;
           user.workspaceId = existing.workspaceId;
           user.role = existing.role;
           user.sessionVersion = existing.sessionVersion;
+          user.emailVerified = existing.emailVerified ?? new Date();
         }
       }
+
+      // Credentials users must verify their email before signing in.
+      if (account?.provider === "credentials" && !user.emailVerified) {
+        return false;
+      }
+
       return true;
     },
     async jwt({ token, user }) {
@@ -97,6 +115,7 @@ export const authOptions: NextAuthOptions = {
         token.workspaceId = user.workspaceId;
         token.role = user.role;
         token.sessionVersion = user.sessionVersion;
+        token.emailVerified = user.emailVerified;
       }
       return token;
     },

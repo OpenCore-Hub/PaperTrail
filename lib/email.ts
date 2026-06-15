@@ -88,6 +88,65 @@ export async function sendInviteEmail(
  * If RESEND_API_KEY is missing, the reset URL is logged to the console
  * for local development.
  */
+export interface VerificationEmailInput {
+  to: string;
+  verifyUrl: string;
+}
+
+export async function sendVerificationEmail(
+  input: VerificationEmailInput,
+): Promise<SendResult> {
+  const from = process.env.EMAIL_FROM_ADDRESS || "onboarding@resend.dev";
+  const subject = "Verify your DocHub email address";
+  const html = `
+    <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+      <h2>Verify your email address</h2>
+      <p>Click the button below to verify your DocHub account. This link expires in 24 hours.</p>
+      <p>
+        <a
+          href="${input.verifyUrl}"
+          style="display: inline-block; padding: 12px 24px; background: #111; color: #fff; text-decoration: none; border-radius: 6px;"
+        >
+          Verify email
+        </a>
+      </p>
+      <p style="color: #666; font-size: 13px;">
+        Or copy this link into your browser:
+        <br />
+        <code>${input.verifyUrl}</code>
+      </p>
+    </div>
+  `;
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.log("[EMAIL FALLBACK] Verification email would be sent:");
+    console.log(`  To: ${input.to}`);
+    console.log(`  From: ${from}`);
+    console.log(`  Subject: ${subject}`);
+    console.log(`  Verify URL: ${input.verifyUrl}`);
+    return { ok: true, provider: "console" };
+  }
+
+  const resend = new Resend(apiKey);
+  const result = await resend.emails.send({
+    from,
+    to: input.to,
+    subject,
+    html,
+  });
+
+  if (result.error) {
+    return {
+      ok: false,
+      provider: "resend",
+      detail: result.error.message,
+    };
+  }
+
+  return { ok: true, provider: "resend" };
+}
+
 export async function sendPasswordResetEmail(
   input: PasswordResetEmailInput,
 ): Promise<SendResult> {

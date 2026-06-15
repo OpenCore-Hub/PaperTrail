@@ -47,6 +47,7 @@ model User {
   password        String?
   role            UserRole  @default(EDITOR)
   sessionVersion  Int       @default(0) @map("session_version")
+  emailVerified   DateTime? @map("email_verified")
   workspaceId     String    @map("workspace_id")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
@@ -54,6 +55,7 @@ model User {
   workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   documents     Document[]
   passwordResetTokens PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
 
   @@map("users")
 }
@@ -69,6 +71,19 @@ model PasswordResetToken {
 
   @@index([email])
   @@map("password_reset_tokens")
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(uuid())
+  email     String   @map("email")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [email], references: [email], onDelete: Cascade)
+
+  @@index([email])
+  @@map("email_verification_tokens")
 }
 
 enum UserRole {

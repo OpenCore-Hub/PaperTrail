@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Session invalidation on password reset**: `users.session_version` is incremented when a password is reset; existing JWT sessions are rejected on the next session check.
 - **Custom domain periodic re-verification**: DNS is re-checked on every viewer-page request served via a custom domain, and the cleanup cron revokes verification for domains that no longer point to the application.
 - Signup route tests including rate-limit behavior (`app/api/auth/signup/__tests__/route.test.ts`).
+- **Email verification for password sign-ups**: new `email_verified` column and `email_verification_tokens` table; signup sends a 24-hour verification link via Resend; unverified credentials cannot sign in; Google sign-ins are automatically verified; verification and resend endpoints with rate limiting and tests.
 
 ### Changed
 

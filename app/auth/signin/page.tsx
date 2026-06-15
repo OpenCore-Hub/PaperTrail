@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { getCsrfToken, signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,8 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 
-export default function SignInPage() {
+function SignInForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,7 +22,11 @@ export default function SignInPage() {
     // Ensure the CSRF cookie is set before the credentials form is submitted.
     // This is especially important for test environments and fast form submissions.
     getCsrfToken().then((token) => setCsrfToken(token ?? ""));
-  }, []);
+
+    if (searchParams.get("verified") === "1") {
+      toast.success("Email verified. You can now sign in.");
+    }
+  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -40,7 +45,11 @@ export default function SignInPage() {
     setLoading(false);
 
     if (result?.error) {
-      toast.error("Invalid email or password");
+      if (result.error === "AccessDenied") {
+        toast.error("Please verify your email before signing in.");
+      } else {
+        toast.error("Invalid email or password");
+      }
       return;
     }
 
@@ -145,5 +154,13 @@ export default function SignInPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignInForm />
+    </Suspense>
   );
 }

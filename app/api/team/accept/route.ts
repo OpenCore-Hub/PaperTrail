@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { teamInviteCounter, withMetrics } from "@/lib/metrics";
+import { createLogger } from "@/lib/logger";
 import { z } from "zod";
+
+const log = createLogger("api:team:accept");
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +63,7 @@ async function handler(req: NextRequest) {
           password: passwordHash,
           role: invite.role,
           workspaceId: invite.workspaceId,
+          emailVerified: new Date(),
         },
       });
 
@@ -92,7 +96,7 @@ async function handler(req: NextRequest) {
         { status: 400 },
       );
     }
-    console.error("Invite accept error:", error);
+    log.error({ error }, "team.invite_accept_failed");
     return NextResponse.json(
       { error: "Failed to accept invite" },
       { status: 500 },
