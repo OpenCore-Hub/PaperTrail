@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createLogger } from "@/lib/logger";
 import { canManageDocuments, type UserRole } from "@/lib/roles";
+import { getLatestVersionOrThrow } from "@/lib/documents/get-latest-version";
+import { getStorageProvider } from "@/lib/storage/factory";
 
 const log = createLogger("api:documents");
 
@@ -39,9 +41,9 @@ export async function DELETE(
     // Best-effort cleanup of the stored PDF. The DB row is deleted even if
     // storage cleanup fails so the user is not stuck with an undeletable doc.
     try {
-      const { UTApi } = await import("uploadthing/server");
-      const utapi = new UTApi();
-      await utapi.deleteFiles(document.storageKey);
+      const version = await getLatestVersionOrThrow(document.id);
+      const storage = getStorageProvider();
+      await storage.delete(version.storageKey);
     } catch (storageError) {
       log.error(
         { documentId: params.id, error: storageError },

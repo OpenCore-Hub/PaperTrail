@@ -6,25 +6,18 @@ const {
   getServerSessionMock,
   documentFindFirstMock,
   documentDeleteMock,
-  deleteFilesMock,
-  MockUTApi,
-} = vi.hoisted(() => {
-  const sendMock = vi.fn();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  function MockUTApi(this: any) {
-    this.deleteFiles = sendMock;
-  }
-  return {
-    getServerSessionMock: vi.fn(),
-    documentFindFirstMock: vi.fn(),
-    documentDeleteMock: vi.fn(),
-    deleteFilesMock: sendMock,
-    MockUTApi,
-  };
-});
+  getLatestVersionOrThrowMock,
+  storageDeleteMock,
+} = vi.hoisted(() => ({
+  getServerSessionMock: vi.fn(),
+  documentFindFirstMock: vi.fn(),
+  documentDeleteMock: vi.fn(),
+  getLatestVersionOrThrowMock: vi.fn(),
+  storageDeleteMock: vi.fn(),
+}));
 
 vi.mock("uploadthing/server", () => ({
-  UTApi: MockUTApi,
+  UTApi: vi.fn(),
 }));
 
 vi.mock("next-auth", () => ({
@@ -38,6 +31,16 @@ vi.mock("@/lib/prisma", () => ({
       delete: documentDeleteMock,
     },
   },
+}));
+
+vi.mock("@/lib/documents/get-latest-version", () => ({
+  getLatestVersionOrThrow: getLatestVersionOrThrowMock,
+}));
+
+vi.mock("@/lib/storage/factory", () => ({
+  getStorageProvider: vi.fn().mockImplementation(() => ({
+    delete: storageDeleteMock,
+  })),
 }));
 
 function makeRequest(id = "doc-1"): NextRequest {
@@ -78,25 +81,25 @@ describe("DELETE /api/documents/[id]", () => {
 
   it("deletes the document and cleans up storage", async () => {
     mockSession();
-    documentFindFirstMock.mockResolvedValue({
-      id: "doc-1",
+    documentFindFirstMock.mockResolvedValue({ id: "doc-1" });
+    getLatestVersionOrThrowMock.mockResolvedValue({
       storageKey: "file-key-123",
     });
-    deleteFilesMock.mockResolvedValue({ success: true });
+    storageDeleteMock.mockResolvedValue(undefined);
 
     const res = await DELETE(makeRequest(), { params: { id: "doc-1" } });
     expect(res.status).toBe(200);
-    expect(deleteFilesMock).toHaveBeenCalledWith("file-key-123");
+    expect(storageDeleteMock).toHaveBeenCalledWith("file-key-123");
     expect(documentDeleteMock).toHaveBeenCalledWith({ where: { id: "doc-1" } });
   });
 
   it("deletes the DB row even if storage cleanup fails", async () => {
     mockSession();
-    documentFindFirstMock.mockResolvedValue({
-      id: "doc-1",
+    documentFindFirstMock.mockResolvedValue({ id: "doc-1" });
+    getLatestVersionOrThrowMock.mockResolvedValue({
       storageKey: "file-key-123",
     });
-    deleteFilesMock.mockRejectedValue(new Error("UploadThing down"));
+    storageDeleteMock.mockRejectedValue(new Error("Storage down"));
 
     const res = await DELETE(makeRequest(), { params: { id: "doc-1" } });
     expect(res.status).toBe(200);
