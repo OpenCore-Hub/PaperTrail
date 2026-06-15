@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
 import { GET } from "../route";
+
+function makeRequest(): NextRequest {
+  return new NextRequest(
+    "http://localhost:3000/api/user/export",
+  ) as NextRequest;
+}
 
 const { getServerSessionMock, userFindUniqueMock } = vi.hoisted(() => ({
   getServerSessionMock: vi.fn(),
@@ -31,14 +38,14 @@ describe("GET /api/user/export", () => {
 
   it("rejects unauthenticated users", async () => {
     getServerSessionMock.mockResolvedValue(null);
-    const res = await GET();
+    const res = await GET(makeRequest());
     expect(res.status).toBe(401);
   });
 
   it("returns 404 when user is not found", async () => {
     mockSession();
     userFindUniqueMock.mockResolvedValue(null);
-    const res = await GET();
+    const res = await GET(makeRequest());
     expect(res.status).toBe(404);
   });
 
@@ -107,7 +114,7 @@ describe("GET /api/user/export", () => {
       emailVerificationTokens: [],
     });
 
-    const res = await GET();
+    const res = await GET(makeRequest());
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("application/json");
     expect(res.headers.get("Content-Disposition")).toContain(

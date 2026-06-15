@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { createLogger } from "@/lib/logger";
+import { getRequestLogger } from "@/lib/logger";
+import { audit } from "@/lib/audit";
+import { withRequestContext } from "@/lib/with-request-context";
 import { enforceRateLimit, RateLimits } from "@/lib/rate-limit";
 import { UserRole } from "@/lib/roles";
 import { z } from "zod";
-
-const log = createLogger("api:team:members");
 
 export const dynamic = "force-dynamic";
 
@@ -15,10 +15,12 @@ const updateSchema = z.object({
   role: z.enum([UserRole.ADMIN, UserRole.EDITOR, UserRole.VIEWER]),
 });
 
-export async function PATCH(
+async function patchHandler(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
+  const log = getRequestLogger("api:team:members");
+
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.workspaceId || session.user.role !== "ADMIN") {
@@ -64,6 +66,12 @@ export async function PATCH(
       select: { id: true, email: true, name: true, role: true },
     });
 
+    audit("team.member_updated", {
+      targetUserId: updated.id,
+      newRole: updated.role,
+      workspaceId: session.user.workspaceId,
+    });
+
     return NextResponse.json({ member: updated });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -80,10 +88,12 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
+async function deleteHandler(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
+  const log = getRequestLogger("api:team:members");
+
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.workspaceId || session.user.role !== "ADMIN") {
@@ -129,6 +139,11 @@ export async function DELETE(
 
     await prisma.user.delete({ where: { id: params.id } });
 
+    audit("team.member_removed", {
+      targetUserId: params.id,
+      workspaceId: session.user.workspaceId,
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     log.error({ error }, "team.member_delete_failed");
@@ -138,3 +153,6 @@ export async function DELETE(
     );
   }
 }
+
+export const PATCH = withRequestContext(patchHandler);
+export const DELETE = withRequestContext(deleteHandler);

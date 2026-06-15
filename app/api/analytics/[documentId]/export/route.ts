@@ -2,12 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getRequestLogger } from "@/lib/logger";
+import { withRequestContext } from "@/lib/with-request-context";
 
 export const dynamic = "force-dynamic";
 
 function escapeCsv(value: string | number | null | undefined): string {
   const str = value === null || value === undefined ? "" : String(value);
-  if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
+  if (
+    str.includes(",") ||
+    str.includes('"') ||
+    str.includes("\n") ||
+    str.includes("\r")
+  ) {
     return `"${str.replace(/"/g, '""')}"`;
   }
   return str;
@@ -17,10 +24,12 @@ function toCsv(rows: Array<Array<string | number | null | undefined>>): string {
   return rows.map((row) => row.map(escapeCsv).join(",")).join("\n");
 }
 
-export async function GET(
+async function handler(
   _req: NextRequest,
   { params }: { params: { documentId: string } },
 ) {
+  const log = getRequestLogger("api:analytics:export");
+
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.workspaceId) {
@@ -77,7 +86,9 @@ export async function GET(
     ];
 
     for (const session of sessions) {
-      const pageNumbers = session.pageViews.map((pv) => pv.pageNumber).join("; ");
+      const pageNumbers = session.pageViews
+        .map((pv) => pv.pageNumber)
+        .join("; ");
       const pageTime = session.pageViews
         .map((pv) => `${pv.pageNumber}:${pv.durationSeconds}`)
         .join("; ");
@@ -103,10 +114,15 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("Analytics export error:", error);
+    log.error(
+      { documentId: params.documentId, error },
+      "analytics.export_failed",
+    );
     return NextResponse.json(
       { error: "Failed to export analytics" },
       { status: 500 },
     );
   }
 }
+
+export const GET = withRequestContext(handler);

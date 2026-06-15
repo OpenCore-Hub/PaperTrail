@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { getRequestLogger } from "@/lib/logger";
+import { withRequestContext } from "@/lib/with-request-context";
 import { getDocumentAnalytics } from "@/lib/analytics";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(
+async function handler(
   _req: NextRequest,
   { params }: { params: { documentId: string } },
 ) {
+  const log = getRequestLogger("api:analytics");
+
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.workspaceId) {
@@ -31,7 +35,9 @@ export async function GET(
     if (message === "Document not found") {
       return NextResponse.json({ error: message }, { status: 404 });
     }
-    console.error("Analytics error:", error);
+    log.error({ documentId: params.documentId, error }, "analytics.get_failed");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export const GET = withRequestContext(handler);

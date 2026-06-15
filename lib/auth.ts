@@ -11,6 +11,8 @@ import {
   clearFailedLogins,
 } from "./account-lockout";
 import { verifyHcaptchaToken } from "./hcaptcha";
+import { setRequestUserId } from "./async-context";
+import { audit } from "./audit";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -122,6 +124,7 @@ export const authOptions: NextAuthOptions = {
           user.role = created.role;
           user.sessionVersion = created.sessionVersion;
           user.emailVerified = created.emailVerified;
+          setRequestUserId(created.id);
         } else {
           // Trust Google as a verified email source and backfill legacy users.
           if (!existing.emailVerified) {
@@ -136,6 +139,7 @@ export const authOptions: NextAuthOptions = {
           user.role = existing.role;
           user.sessionVersion = existing.sessionVersion;
           user.emailVerified = existing.emailVerified ?? new Date();
+          setRequestUserId(existing.id);
         }
       }
 
@@ -194,5 +198,19 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: "/auth/signin",
+  },
+  events: {
+    async signIn({ user, account }) {
+      audit("auth.signin", {
+        provider: account?.provider,
+        userId: user.id,
+        email: user.email,
+      });
+    },
+    async signOut({ token }) {
+      audit("auth.signout", {
+        userId: token?.id,
+      });
+    },
   },
 };

@@ -3,10 +3,10 @@ import { customAlphabet } from "nanoid";
 import { prisma } from "@/lib/prisma";
 import { sendVerificationEmail } from "@/lib/email";
 import { enforceRateLimit, RateLimits } from "@/lib/rate-limit";
-import { createLogger } from "@/lib/logger";
+import { getRequestLogger } from "@/lib/logger";
+import { audit } from "@/lib/audit";
+import { withRequestContext } from "@/lib/with-request-context";
 import { z } from "zod";
-
-const log = createLogger("api:auth:verify-email");
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +28,9 @@ function absoluteUrl(req: NextRequest, path: string): string {
  * This is the endpoint clicked from verification emails, so it redirects
  * rather than returning JSON.
  */
-export async function GET(req: NextRequest) {
+async function getHandler(req: NextRequest) {
+  const log = getRequestLogger("api:auth:verify-email");
+
   const token = req.nextUrl.searchParams.get("token");
 
   if (!token) {
@@ -63,9 +65,9 @@ export async function GET(req: NextRequest) {
       "auth.email_verification_completed",
     );
 
-    return NextResponse.redirect(
-      absoluteUrl(req, "/auth/signin?verified=1"),
-    );
+    audit("auth.email_verified", { email: verificationToken.email });
+
+    return NextResponse.redirect(absoluteUrl(req, "/auth/signin?verified=1"));
   } catch (error) {
     log.error({ error }, "auth.email_verification_failed");
     return NextResponse.redirect(
@@ -80,7 +82,9 @@ export async function GET(req: NextRequest) {
  * Resends a verification email for an unverified account. Always returns the
  * same response to avoid leaking whether an email is registered.
  */
-export async function POST(req: NextRequest) {
+async function postHandler(req: NextRequest) {
+  const log = getRequestLogger("api:auth:verify-email");
+
   const rateLimit = await enforceRateLimit(
     req,
     "auth:verify-email:resend",
@@ -100,7 +104,10 @@ export async function POST(req: NextRequest) {
 
     if (!user || user.emailVerified || !user.password) {
       return NextResponse.json(
-        { message: "If the account exists and is unverified, a new email has been sent." },
+        {
+          message:
+            "If the account exists and is unverified, a new email has been sent.",
+        },
         { status: 200 },
       );
     }
@@ -131,7 +138,10 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(
-      { message: "If the account exists and is unverified, a new email has been sent." },
+      {
+        message:
+          "If the account exists and is unverified, a new email has been sent.",
+      },
       { status: 200 },
     );
   } catch (error) {
@@ -148,3 +158,6 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export const GET = withRequestContext(getHandler);
+export const POST = withRequestContext(postHandler);

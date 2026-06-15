@@ -4,6 +4,9 @@ import bcrypt from "bcryptjs";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateShareSlug } from "@/lib/slug";
+import { getRequestLogger } from "@/lib/logger";
+import { audit } from "@/lib/audit";
+import { withRequestContext } from "@/lib/with-request-context";
 import { enforceRateLimit, RateLimits } from "@/lib/rate-limit";
 import { canManageDocuments, type UserRole } from "@/lib/roles";
 import { z } from "zod";
@@ -18,7 +21,9 @@ const createLinkSchema = z.object({
   allowDownload: z.boolean().default(false),
 });
 
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
+  const log = getRequestLogger("api:share");
+
   try {
     const session = await getServerSession(authOptions);
     if (
@@ -71,6 +76,12 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    audit("share.created", {
+      linkId: link.id,
+      documentId: document.id,
+      workspaceId: session.user.workspaceId,
+    });
+
     return NextResponse.json({ slug: link.slug }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -79,10 +90,12 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    console.error("Create share link error:", error);
+    log.error({ error }, "share.create_failed");
     return NextResponse.json(
       { error: "Failed to create link" },
       { status: 500 },
     );
   }
 }
+
+export const POST = withRequestContext(handler);

@@ -5,6 +5,9 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendInviteEmail } from "@/lib/email";
 import { teamInviteCounter, withMetrics } from "@/lib/metrics";
+import { getRequestLogger } from "@/lib/logger";
+import { audit } from "@/lib/audit";
+import { withRequestContext } from "@/lib/with-request-context";
 import { enforceRateLimit, RateLimits } from "@/lib/rate-limit";
 import { UserRole } from "@/lib/roles";
 import { z } from "zod";
@@ -22,6 +25,8 @@ const inviteSchema = z.object({
 const INVITE_TTL_DAYS = 7;
 
 async function handler(req: NextRequest) {
+  const log = getRequestLogger("api:team:invite");
+
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.workspaceId || session.user.role !== "ADMIN") {
@@ -105,6 +110,13 @@ async function handler(req: NextRequest) {
 
     teamInviteCounter.inc({ operation: "created" });
 
+    audit("team.invite_sent", {
+      inviteId: invite.id,
+      email: invite.email,
+      role: invite.role,
+      workspaceId,
+    });
+
     return NextResponse.json(
       {
         invite: {
@@ -128,7 +140,7 @@ async function handler(req: NextRequest) {
         { status: 400 },
       );
     }
-    console.error("Invite creation error:", error);
+    log.error({ error }, "team.invite_create_failed");
     return NextResponse.json(
       { error: "Failed to create invite" },
       { status: 500 },
@@ -136,4 +148,6 @@ async function handler(req: NextRequest) {
   }
 }
 
-export const POST = withMetrics("/api/team/invite", handler);
+export const POST = withRequestContext(
+  withMetrics("/api/team/invite", handler),
+);

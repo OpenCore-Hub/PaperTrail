@@ -3,12 +3,12 @@ import { getServerSession } from "next-auth";
 import bcrypt from "bcryptjs";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { createLogger } from "@/lib/logger";
+import { getRequestLogger } from "@/lib/logger";
+import { audit } from "@/lib/audit";
+import { withRequestContext } from "@/lib/with-request-context";
 import { enforceRateLimit, RateLimits } from "@/lib/rate-limit";
 import { canManageDocuments, type UserRole } from "@/lib/roles";
 import { z } from "zod";
-
-const log = createLogger("api:share");
 
 export const dynamic = "force-dynamic";
 
@@ -30,10 +30,12 @@ const updateLinkSchema = z.object({
   allowDownload: z.boolean().optional(),
 });
 
-export async function GET(
+async function getHandler(
   _req: NextRequest,
   { params }: { params: { id: string } },
 ) {
+  const log = getRequestLogger("api:share");
+
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.workspaceId) {
@@ -58,7 +60,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("Get link error:", error);
+    log.error({ error }, "share.get_failed");
     return NextResponse.json(
       { error: "Failed to fetch link" },
       { status: 500 },
@@ -66,10 +68,12 @@ export async function GET(
   }
 }
 
-export async function PATCH(
+async function patchHandler(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
+  const log = getRequestLogger("api:share");
+
   try {
     const session = await getServerSession(authOptions);
     if (
@@ -118,6 +122,12 @@ export async function PATCH(
       },
     });
 
+    audit("share.updated", {
+      linkId: updated.id,
+      documentId: updated.documentId,
+      workspaceId: session.user.workspaceId,
+    });
+
     return NextResponse.json({
       link: {
         id: updated.id,
@@ -145,10 +155,12 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
+async function deleteHandler(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
+  const log = getRequestLogger("api:share");
+
   try {
     const session = await getServerSession(authOptions);
     if (
@@ -175,6 +187,11 @@ export async function DELETE(
 
     await prisma.shareLink.delete({ where: { id: params.id } });
 
+    audit("share.deleted", {
+      linkId: params.id,
+      workspaceId: session.user.workspaceId,
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     log.error({ error }, "share.delete_failed");
@@ -184,3 +201,7 @@ export async function DELETE(
     );
   }
 }
+
+export const GET = withRequestContext(getHandler);
+export const PATCH = withRequestContext(patchHandler);
+export const DELETE = withRequestContext(deleteHandler);

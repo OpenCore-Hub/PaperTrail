@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { customAlphabet } from "nanoid";
 import { prisma } from "@/lib/prisma";
 import { sendPasswordResetEmail } from "@/lib/email";
-import { createLogger } from "@/lib/logger";
+import { getRequestLogger } from "@/lib/logger";
+import { audit } from "@/lib/audit";
+import { withRequestContext } from "@/lib/with-request-context";
 import { enforceRateLimit, RateLimits } from "@/lib/rate-limit";
 import { z } from "zod";
-
-const log = createLogger("api:auth:forgot-password");
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,9 @@ const forgotSchema = z.object({
 // 1-hour reset token
 const RESET_TTL_MS = 60 * 60 * 1000;
 
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
+  const log = getRequestLogger("api:auth:forgot-password");
+
   const rateLimit = await enforceRateLimit(
     req,
     "auth:forgot-password",
@@ -64,6 +66,8 @@ export async function POST(req: NextRequest) {
       resetUrl,
     });
 
+    audit("auth.password_reset_requested", { email: user.email });
+
     return NextResponse.json(
       { message: "If an account exists, a reset email has been sent." },
       { status: 200 },
@@ -82,3 +86,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export const POST = withRequestContext(handler);

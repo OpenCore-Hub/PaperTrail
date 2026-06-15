@@ -3,10 +3,10 @@ import { getServerSession } from "next-auth";
 import bcrypt from "bcryptjs";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { createLogger } from "@/lib/logger";
+import { getRequestLogger } from "@/lib/logger";
+import { audit } from "@/lib/audit";
+import { withRequestContext } from "@/lib/with-request-context";
 import { z } from "zod";
-
-const log = createLogger("api:user:delete");
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,9 @@ const deleteSchema = z.object({
   password: z.string().min(1),
 });
 
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
+  const log = getRequestLogger("api:user:delete");
+
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -52,7 +54,7 @@ export async function POST(req: NextRequest) {
 
     await prisma.user.delete({ where: { id: user.id } });
 
-    log.info({ userId: user.id }, "user.deleted");
+    audit("user.deleted", { userId: user.id, email: user.email });
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -69,3 +71,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export const POST = withRequestContext(handler);

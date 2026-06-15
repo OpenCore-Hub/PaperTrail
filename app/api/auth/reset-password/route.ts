@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { createLogger } from "@/lib/logger";
+import { getRequestLogger } from "@/lib/logger";
+import { audit } from "@/lib/audit";
+import { withRequestContext } from "@/lib/with-request-context";
 import { enforceRateLimit, RateLimits } from "@/lib/rate-limit";
 import { z } from "zod";
-
-const log = createLogger("api:auth:reset-password");
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,9 @@ const resetSchema = z.object({
   password: z.string().min(8),
 });
 
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
+  const log = getRequestLogger("api:auth:reset-password");
+
   const rateLimit = await enforceRateLimit(
     req,
     "auth:reset-password",
@@ -54,6 +56,8 @@ export async function POST(req: NextRequest) {
       }),
     ]);
 
+    audit("auth.password_reset_completed", { email: resetToken.email });
+
     return NextResponse.json(
       { message: "Password updated successfully" },
       { status: 200 },
@@ -72,3 +76,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export const POST = withRequestContext(handler);

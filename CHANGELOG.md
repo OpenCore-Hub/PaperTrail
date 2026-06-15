@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Graceful shutdown**: `instrumentation.ts` registers SIGTERM/SIGINT handlers that close the Redis connection and disconnect Prisma within a 10-second timeout; `/api/health` returns 503 while shutting down.
 - **GDPR data export and account deletion**: new `/api/user/export` and `/api/user/delete` endpoints plus `/dashboard/settings/account` UI for users to download their data or delete their account after password confirmation.
 - **Self-hosted PDF.js worker**: the viewer no longer loads the worker from cdnjs; `public/pdf.worker.min.mjs` is copied from `pdfjs-dist` via a `postinstall` script and served locally. Removed cdnjs from the CSP `script-src`.
+- **Request ID / correlation tracing**: `lib/async-context.ts` stores per-request context (requestId, path, IP, actor userId); `lib/with-request-context.ts` wraps API handlers so responses include `X-Request-Id`; `getRequestLogger()` automatically enriches Pino logs with these fields.
+- **Audit logging**: `lib/audit.ts` emits structured `audit.*` events for sign-in/sign-out, signup, password reset, email verification, document/share/team mutations, and account export/deletion.
+- **Structured error logging sweep**: replaced the remaining `console.error` calls in analytics, share, and team invite routes with Pino loggers.
+
+### Changed
+
+- API route handlers for auth, documents, shares, team, user export/delete, and analytics now run inside `withRequestContext` and use request-scoped loggers.
 
 ### Changed
 

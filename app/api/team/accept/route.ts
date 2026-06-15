@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { teamInviteCounter, withMetrics } from "@/lib/metrics";
-import { createLogger } from "@/lib/logger";
+import { getRequestLogger } from "@/lib/logger";
+import { audit } from "@/lib/audit";
+import { withRequestContext } from "@/lib/with-request-context";
 import { z } from "zod";
-
-const log = createLogger("api:team:accept");
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +16,8 @@ const acceptSchema = z.object({
 });
 
 async function handler(req: NextRequest) {
+  const log = getRequestLogger("api:team:accept");
+
   try {
     const body = await req.json();
     const parsed = acceptSchema.parse(body);
@@ -77,6 +79,13 @@ async function handler(req: NextRequest) {
 
     teamInviteCounter.inc({ operation: "accepted" });
 
+    audit("team.invite_accepted", {
+      userId: user.id,
+      email: user.email,
+      workspaceId: user.workspaceId,
+      role: user.role,
+    });
+
     return NextResponse.json(
       {
         user: {
@@ -104,4 +113,6 @@ async function handler(req: NextRequest) {
   }
 }
 
-export const POST = withMetrics("/api/team/accept", handler);
+export const POST = withRequestContext(
+  withMetrics("/api/team/accept", handler),
+);

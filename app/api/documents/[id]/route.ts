@@ -2,18 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { createLogger } from "@/lib/logger";
+import { getRequestLogger } from "@/lib/logger";
+import { audit } from "@/lib/audit";
+import { withRequestContext } from "@/lib/with-request-context";
 import { enforceRateLimit, RateLimits } from "@/lib/rate-limit";
 import { canManageDocuments, type UserRole } from "@/lib/roles";
 
-const log = createLogger("api:documents");
-
 export const dynamic = "force-dynamic";
 
-export async function DELETE(
+async function handler(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
+  const log = getRequestLogger("api:documents");
+
   try {
     const session = await getServerSession(authOptions);
     if (
@@ -62,6 +64,11 @@ export async function DELETE(
 
     await prisma.document.delete({ where: { id: params.id } });
 
+    audit("document.deleted", {
+      documentId: params.id,
+      workspaceId: session.user.workspaceId,
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     log.error({ documentId: params.id, error }, "documents.delete_failed");
@@ -71,3 +78,5 @@ export async function DELETE(
     );
   }
 }
+
+export const DELETE = withRequestContext(handler);

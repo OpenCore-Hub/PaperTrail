@@ -6,10 +6,10 @@ import { generateWorkspaceSlug } from "@/lib/slug";
 import { enforceRateLimit, RateLimits } from "@/lib/rate-limit";
 import { sendVerificationEmail } from "@/lib/email";
 import { verifyHcaptchaToken } from "@/lib/hcaptcha";
-import { createLogger } from "@/lib/logger";
+import { getRequestLogger } from "@/lib/logger";
+import { audit } from "@/lib/audit";
+import { withRequestContext } from "@/lib/with-request-context";
 import { z } from "zod";
-
-const log = createLogger("api:auth:signup");
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,9 @@ const signupSchema = z.object({
 // 24-hour verification token
 const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
+  const log = getRequestLogger("api:auth:signup");
+
   const rateLimit = await enforceRateLimit(req, "auth:signup", RateLimits.auth);
   if (!rateLimit.allowed) {
     return rateLimit.response!;
@@ -106,6 +108,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    audit("auth.signup", { email: parsed.email, workspaceSlug: slug });
+
     return NextResponse.json(
       {
         success: true,
@@ -127,3 +131,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export const POST = withRequestContext(handler);

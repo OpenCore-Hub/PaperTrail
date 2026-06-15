@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getRequestLogger } from "@/lib/logger";
+import { withRequestContext } from "@/lib/with-request-context";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+async function handler(req: NextRequest) {
+  const log = getRequestLogger("api:team:invite:verify");
+
   try {
     const { searchParams } = new URL(req.url);
     const token = searchParams.get("token");
@@ -40,10 +44,12 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Invite verify error:", error);
+    log.error({ error }, "team.invite_verify_failed");
     return NextResponse.json(
       { error: "Failed to verify invite" },
       { status: 500 },
     );
   }
 }
+
+export const GET = withRequestContext(handler);
