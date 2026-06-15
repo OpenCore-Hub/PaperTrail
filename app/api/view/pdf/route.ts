@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { pdfCache } from "@/lib/pdf-cache";
 import { createLogger } from "@/lib/logger";
 import { pdfCacheCounter, withMetrics } from "@/lib/metrics";
+import { getLatestVersionOrThrow } from "@/lib/documents/get-latest-version";
 
 const log = createLogger("api:view:pdf");
 
@@ -51,11 +52,13 @@ async function handler(req: NextRequest) {
     }
 
     const { document } = link;
+    const version = await getLatestVersionOrThrow(document.id);
+    const storageKey = version.storageKey;
 
     // Check the server-side cache first to avoid repeated UploadThing fetches.
-    const cached = await pdfCache.get(document.storageKey);
+    const cached = await pdfCache.get(storageKey);
     if (cached) {
-      log.debug({ storageKey: document.storageKey }, "pdf.serve_from_cache");
+      log.debug({ storageKey }, "pdf.serve_from_cache");
       pdfCacheCounter.inc({ outcome: "hit" });
       const headers = new Headers();
       headers.set("Content-Type", cached.metadata.contentType);
@@ -73,12 +76,12 @@ async function handler(req: NextRequest) {
       });
     }
 
-    const fileUrl = `https://utfs.io/f/${document.storageKey}`;
+    const fileUrl = `https://utfs.io/f/${storageKey}`;
 
     const upstream = await fetch(fileUrl);
     if (!upstream.ok) {
       log.error(
-        { storageKey: document.storageKey, status: upstream.status },
+        { storageKey, status: upstream.status },
         "pdf.upstream_fetch_failed",
       );
       pdfCacheCounter.inc({ outcome: "upstream_error" });
@@ -93,7 +96,7 @@ async function handler(req: NextRequest) {
     const arrayBuffer = await upstream.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    await pdfCache.set(document.storageKey, buffer, {
+    await pdfCache.set(storageKey, buffer, {
       filename: document.filename,
       contentType,
       size: buffer.length,

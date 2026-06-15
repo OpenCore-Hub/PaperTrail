@@ -21,7 +21,11 @@ export default async function globalSetup(): Promise<void> {
     },
   });
   await prisma.document.deleteMany({
-    where: { storageKey: seedConstants.storageKey },
+    where: {
+      versions: {
+        some: { storageKey: seedConstants.storageKey },
+      },
+    },
   });
   await prisma.user.deleteMany({
     where: { email: seedConstants.adminEmail },
@@ -52,8 +56,16 @@ export default async function globalSetup(): Promise<void> {
       workspaceId: workspace.id,
       uploadedBy: user.id,
       filename: seedConstants.documentFilename,
-      storageKey: seedConstants.storageKey,
-      fileSize: 1024,
+      versions: {
+        create: {
+          versionNumber: 1,
+          storageKey: seedConstants.storageKey,
+          storageType: "UPLOADTHING",
+          fileSize: 1024,
+          contentType: "application/pdf",
+          createdBy: user.id,
+        },
+      },
     },
   });
 

@@ -52,14 +52,26 @@ export const ourFileRouter = {
         throw new Error("File exceeds 20MB app limit");
       }
 
-      await prisma.document.create({
-        data: {
-          workspaceId: metadata.workspaceId,
-          uploadedBy: metadata.userId,
-          filename: file.name,
-          storageKey: file.key,
-          fileSize: file.size,
-        },
+      await prisma.$transaction(async (tx) => {
+        const document = await tx.document.create({
+          data: {
+            workspaceId: metadata.workspaceId,
+            uploadedBy: metadata.userId,
+            filename: file.name,
+          },
+        });
+
+        await tx.documentVersion.create({
+          data: {
+            documentId: document.id,
+            versionNumber: 1,
+            storageKey: file.key,
+            storageType: "UPLOADTHING",
+            fileSize: file.size,
+            contentType: "application/pdf",
+            createdBy: metadata.userId,
+          },
+        });
       });
     }),
 } satisfies FileRouter;
