@@ -72,7 +72,9 @@ export function ViewerAiPanel({
     )
       .then(async (res) => {
         if (!res.ok) {
-          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          const data = (await res.json().catch(() => ({}))) as {
+            error?: string;
+          };
           throw new Error(data.error ?? "Failed to load chat history");
         }
         return res.json() as Promise<{
@@ -292,7 +294,12 @@ export function ViewerAiPanel({
             maxLength={4000}
             className="flex-1"
           />
-          <Button type="submit" size="icon" disabled={loading || !input.trim()}>
+          <Button
+            type="submit"
+            size="icon"
+            disabled={loading || !input.trim()}
+            aria-label="Send question"
+          >
             <Send className="h-4 w-4" />
           </Button>
         </form>

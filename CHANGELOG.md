@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-15
+
 ### Added
 
 - **Document persistence refactor (ISSUE-001)**:
@@ -23,7 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Lightweight AI indexing job queue (Redis + in-memory fallback) wired to upload/version creation.
   - Workspace AI settings API (`/api/workspaces/ai-config`) and UI page at `/dashboard/settings/ai`.
   - Reserved `POST /api/ai/extract` endpoint returning 501 until v0.4.
-- Structured JSON logging via Pino (`lib/logger.ts`) for production observability.
+  - **Viewer AI Assistant (ISSUE-005)**:
+    - Single-document RAG query (`lib/ai/query.ts`) using pgvector cosine similarity with citation extraction and conversation/message persistence.
+    - Citation parser (`lib/ai/citations.ts`) validates chunk IDs, deduplicates, caps at 8, and preserves answer order.
+    - Workspace-scoped AI query rate limiting (`lib/ai/rate-limit.ts`) and `ai.query` audit events.
+    - `POST /api/documents/[id]/chat` with dual auth (workspace session + viewer grant token); `GET .../chat?conversationId=...` loads history.
+    - Collapsible AI panel in the public document viewer (`components/viewer-ai-panel.tsx`) with clickable page-citation badges that scroll and highlight the target PDF page.
+  - Structured JSON logging via Pino (`lib/logger.ts`) for production observability.
 - Sentry PII scrubbing (`token` query param) and release/environment configuration.
 - New E2E tests for analytics dashboard (`e2e/analytics.spec.ts`) and team invitation flow (`e2e/team.spec.ts`).
 - **PDF proxy cache** (`lib/pdf-cache.ts`): `/api/view/pdf` caches fetched PDFs on disk with configurable TTL, and the cleanup cron prunes expired entries.
@@ -89,5 +97,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Viewer tokens enforce access control and prevent direct storage URL exposure.
 - Production-grade security hardening and PRD consistency review.
 
-[Unreleased]: https://github.com/OpenCore-Hub/PaperTrail/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/OpenCore-Hub/PaperTrail/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/OpenCore-Hub/PaperTrail/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/OpenCore-Hub/PaperTrail/compare/v0.1.0...v0.2.0
