@@ -1,0 +1,69 @@
+version: "3.8"
+
+services:
+  db:
+    image: pgvector/pgvector:pg15
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dochub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-env}
+      POSTGRES_DB: ${POSTGRES_DB:-dochub}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-dochub} -d ${POSTGRES_DB:-dochub}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  backup:
+    image: pgvector/pgvector:pg15
+    restart: unless-stopped
+    env_file:
+      - .env.production.local
+    volumes:
+      - ./scripts/backup-db.sh:/usr/local/bin/backup-db.sh:ro
+      - ./scripts/backup-entrypoint.sh:/usr/local/bin/backup-entrypoint.sh:ro
+      - ./backups:/backups
+    environment:
+      # DATABASE_URL and backup settings are read from .env.production.local.
+      # BACKUP_DIR is pinned to the container path so the volume mount matches.
+      BACKUP_DIR: /backups
+    command: ["/usr/local/bin/backup-entrypoint.sh"]
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    env_file:
+      - .env.production.local
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dochub}:${POSTGRES_PASSWORD:-change-me-in-env}@db:5432/${POSTGRES_DB:-dochub}
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:

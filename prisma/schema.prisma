@@ -1,0 +1,275 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Workspace {
+  id            String            @id @default(uuid())
+  name          String
+  slug          String            @unique
+  customDomain           String?  @unique @map("custom_domain")
+  customDomainVerifiedAt DateTime? @map("custom_domain_verified_at")
+  plan                   String    @default("free")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  users         User[]
+  invites       WorkspaceInvite[]
+  documents     Document[]
+  aiProviderConfig AiProviderConfig?
+
+  @@map("workspaces")
+}
+
+model WorkspaceInvite {
+  id            String    @id @default(uuid())
+  workspaceId   String    @map("workspace_id")
+  email         String
+  role          UserRole  @default(EDITOR)
+  token         String    @unique
+  expiresAt     DateTime  @map("expires_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  acceptedAt    DateTime? @map("accepted_at")
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, email])
+  @@map("workspace_invites")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  name          String?
+  password      String?
+  role          UserRole  @default(EDITOR)
+  workspaceId   String    @map("workspace_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  documents     Document[]
+  versions      DocumentVersion[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@map("users")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  email     String   @map("email")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [email], references: [email], onDelete: Cascade)
+
+  @@index([email])
+  @@map("password_reset_tokens")
+}
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+model Document {
+  id            String    @id @default(uuid())
+  workspaceId   String    @map("workspace_id")
+  uploadedBy    String    @map("uploaded_by")
+  filename      String
+  storageKey    String?   @map("storage_key")
+  fileSize      Int?      @map("file_size")
+  pageCount     Int?      @default(0) @map("page_count")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  uploader      User      @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+  links         ShareLink[]
+  versions      DocumentVersion[]
+
+  @@map("documents")
+}
+
+model DocumentVersion {
+  id            String          @id @default(uuid())
+  documentId    String          @map("document_id")
+  versionNumber Int             @map("version_number")
+  storageKey    String          @map("storage_key")
+  storageType   StorageType     @default(UPLOADTHING) @map("storage_type")
+  fileSize      Int             @map("file_size")
+  pageCount     Int             @default(0) @map("page_count")
+  contentType   String          @map("content_type")
+  aiStatus      AiIndexStatus   @default(PENDING) @map("ai_status")
+  createdBy     String          @map("created_by")
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  document      Document        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  creator       User            @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  chunks        DocumentChunk[]
+
+  @@unique([documentId, versionNumber])
+  @@index([documentId, versionNumber])
+  @@map("document_versions")
+}
+
+enum StorageType {
+  UPLOADTHING
+  S3
+  LOCAL
+}
+
+enum AiIndexStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+model DocumentChunk {
+  id                String          @id @default(uuid())
+  documentVersionId String          @map("document_version_id")
+  content           String
+  embedding         Unsupported("vector(1536)")
+  pageNumber        Int             @map("page_number")
+  paragraphIndex    Int?            @map("paragraph_index")
+  metadata          Json?
+
+  documentVersion   DocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+
+  @@index([documentVersionId])
+  @@map("document_chunks")
+}
+
+enum AiProviderMode {
+  CLOUD
+  BYOK
+  LOCAL
+}
+
+model AiProviderConfig {
+  id          String         @id @default(uuid())
+  workspaceId String         @unique @map("workspace_id")
+  mode        AiProviderMode @default(CLOUD)
+  provider    String
+  model       String
+  apiKey      String?        @map("api_key")
+  baseUrl     String?        @map("base_url")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("ai_provider_configs")
+}
+
+enum AiScopeType {
+  DOCUMENT
+  DATAROOM
+  LINK
+}
+
+enum AiMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+model AiConversation {
+  id        String        @id @default(uuid())
+  scopeType AiScopeType
+  scopeId   String
+  title     String?
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+
+  messages  AiMessage[]
+
+  @@index([scopeType, scopeId])
+  @@map("ai_conversations")
+}
+
+model AiMessage {
+  id             String         @id @default(uuid())
+  conversationId String         @map("conversation_id")
+  role           AiMessageRole
+  content        String
+  citations      Json?
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@map("ai_messages")
+}
+
+model ShareLink {
+  id              String    @id @default(uuid())
+  documentId      String    @map("document_id")
+  slug            String    @unique
+  passwordHash    String?   @map("password_hash")
+  expiresAt       DateTime? @map("expires_at")
+  emailGate       Boolean   @default(false) @map("email_gate")
+  allowDownload   Boolean   @default(false) @map("allow_download")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  document        Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  sessions        ViewSession[]
+  viewerGrants    ViewerGrant[]
+
+  @@index([documentId])
+  @@map("share_links")
+}
+
+model ViewSession {
+  id                String    @id @default(uuid())
+  linkId            String    @map("link_id")
+  fingerprint       String
+  viewerEmail       String?   @map("viewer_email")
+  startedAt         DateTime  @default(now()) @map("started_at")
+  endedAt           DateTime? @map("ended_at")
+  durationSeconds   Int       @default(0) @map("duration_seconds")
+
+  link              ShareLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  pageViews         PageView[]
+
+  @@index([linkId])
+  @@index([startedAt])
+  @@index([fingerprint])
+  @@index([viewerEmail])
+  @@index([linkId, startedAt])
+  @@map("view_sessions")
+}
+
+model ViewerGrant {
+  id        String   @id @default(uuid())
+  linkId    String   @map("link_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  link      ShareLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@map("viewer_grants")
+}
+
+model PageView {
+  id              String    @id @default(uuid())
+  sessionId       String    @map("session_id")
+  pageNumber      Int       @map("page_number")
+  enteredAt       DateTime  @default(now()) @map("entered_at")
+  durationSeconds Int       @default(0) @map("duration_seconds")
+
+  session         ViewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([pageNumber])
+  @@map("page_views")
+}
