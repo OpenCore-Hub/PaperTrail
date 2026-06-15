@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendInviteEmail } from "@/lib/email";
 import { teamInviteCounter, withMetrics } from "@/lib/metrics";
+import { enforceRateLimit, RateLimits } from "@/lib/rate-limit";
 import { UserRole } from "@/lib/roles";
 import { z } from "zod";
 
@@ -25,6 +26,16 @@ async function handler(req: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session?.user?.workspaceId || session.user.role !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const rateLimit = await enforceRateLimit(
+      req,
+      "team:invite",
+      RateLimits.invite,
+      session.user.id,
+    );
+    if (!rateLimit.allowed) {
+      return rateLimit.response!;
     }
 
     const body = await req.json();

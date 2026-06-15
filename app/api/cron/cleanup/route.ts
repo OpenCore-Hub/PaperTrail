@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { pdfCache } from "@/lib/pdf-cache";
 import { createLogger } from "@/lib/logger";
+import { verifyDomainDns } from "@/lib/workspace-domain";
 
 const log = createLogger("api:cron:cleanup");
 
@@ -89,12 +90,38 @@ export async function GET(req: NextRequest) {
 
     const pdfCacheCleanup = await pdfCache.cleanup();
 
+    // Periodically re-verify custom domains. If DNS no longer points to this
+    // application, clear the verified timestamp so the domain is not used for
+    // share links until the admin re-verifies it.
+    const verifiedWorkspaces = await prisma.workspace.findMany({
+      where: { customDomainVerifiedAt: { not: null } },
+      select: { id: true, customDomain: true },
+    });
+
+    let clearedDomains = 0;
+    for (const ws of verifiedWorkspaces) {
+      if (!ws.customDomain) continue;
+      const check = await verifyDomainDns(ws.customDomain);
+      if (!check.ok) {
+        await prisma.workspace.update({
+          where: { id: ws.id },
+          data: { customDomainVerifiedAt: null },
+        });
+        clearedDomains++;
+        log.warn(
+          { workspaceId: ws.id, domain: ws.customDomain },
+          "cleanup.custom_domain_verification_revoked",
+        );
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       deletedExpiredLinks: expiredLinksResult.count,
       closedStaleSessions: closedStaleSessionsResult.count,
       deletedOldSessions: oldSessionsResult.count,
       deletedPdfCacheEntries: pdfCacheCleanup.deleted,
+      clearedDomains,
     });
   } catch (error) {
     log.error({ error }, "cleanup.failed");

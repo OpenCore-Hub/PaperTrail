@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { POST } from "../route";
+import { resetRateLimits } from "@/lib/rate-limit";
 
 const {
   getServerSessionMock,
@@ -45,6 +46,7 @@ function makeRequest(body: object): NextRequest {
 describe("POST /api/team/invite", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetRateLimits();
     process.env.NEXTAUTH_URL = "http://localhost:3000";
   });
 
@@ -65,6 +67,33 @@ describe("POST /api/team/invite", () => {
 
     const res = await POST(makeRequest({ email: "a@b.com", role: "EDITOR" }));
     expect(res.status).toBe(401);
+  });
+
+  it("returns 429 after exceeding the invite rate limit", async () => {
+    mockAdminSession();
+    userFindUniqueMock.mockResolvedValue(null);
+    inviteFindUniqueMock.mockResolvedValue(null);
+    workspaceFindUniqueMock.mockResolvedValue({ name: "Test Workspace" });
+    inviteUpsertMock.mockResolvedValue({
+      id: "invite-1",
+      email: "rate@example.com",
+      role: "EDITOR",
+      token: "token",
+      expiresAt: new Date("2099-01-01"),
+    });
+
+    // The invite window allows 30 requests per admin per hour.
+    for (let i = 0; i < 30; i++) {
+      const res = await POST(
+        makeRequest({ email: `rate${i}@example.com`, role: "EDITOR" }),
+      );
+      expect(res.status).toBe(201);
+    }
+
+    const blocked = await POST(
+      makeRequest({ email: "blocked@example.com", role: "EDITOR" }),
+    );
+    expect(blocked.status).toBe(429);
   });
 
   it("creates a VIEWER invite", async () => {

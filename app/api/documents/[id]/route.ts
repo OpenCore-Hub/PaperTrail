@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createLogger } from "@/lib/logger";
+import { enforceRateLimit, RateLimits } from "@/lib/rate-limit";
 import { canManageDocuments, type UserRole } from "@/lib/roles";
 
 const log = createLogger("api:documents");
@@ -10,7 +11,7 @@ const log = createLogger("api:documents");
 export const dynamic = "force-dynamic";
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } },
 ) {
   try {
@@ -20,6 +21,16 @@ export async function DELETE(
       !canManageDocuments(session.user.role as UserRole)
     ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const rateLimit = await enforceRateLimit(
+      req,
+      "document:delete",
+      RateLimits.documentMutation,
+      session.user.id,
+    );
+    if (!rateLimit.allowed) {
+      return rateLimit.response!;
     }
 
     const document = await prisma.document.findFirst({

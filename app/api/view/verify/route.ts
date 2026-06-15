@@ -17,8 +17,9 @@ const verifySchema = z.object({
   viewerEmail: z.string().email().optional(),
 });
 
-// 5-minute viewer access grant
-const GRANT_TTL_MINUTES = 5;
+// 60-minute viewer access grant. The grant is refreshed while the viewer is
+// actively fetching the PDF so long sessions do not time out mid-read.
+const GRANT_TTL_MINUTES = 60;
 
 // Rate limit: 10 verify attempts per link per IP per 15 minutes.
 const VERIFY_RATE_LIMIT = { maxRequests: 10, windowMs: 15 * 60 * 1000 };

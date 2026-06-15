@@ -14,6 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New E2E tests for analytics dashboard (`e2e/analytics.spec.ts`) and team invitation flow (`e2e/team.spec.ts`).
 - **PDF proxy cache** (`lib/pdf-cache.ts`): `/api/view/pdf` caches fetched PDFs on disk with configurable TTL, and the cleanup cron prunes expired entries.
 - Unit tests for the PDF cache (`lib/__tests__/pdf-cache.test.ts`).
+- **Rate limiting across auth and workspace mutation endpoints**: signup, forgot-password, reset-password, team invite/cancel, share create/update/delete, document delete, and team member update/delete. Uses Redis when `REDIS_URL` is set, with an in-memory fallback.
+- **Session invalidation on password reset**: `users.session_version` is incremented when a password is reset; existing JWT sessions are rejected on the next session check.
+- **Custom domain periodic re-verification**: DNS is re-checked on every viewer-page request served via a custom domain, and the cleanup cron revokes verification for domains that no longer point to the application.
+- Signup route tests including rate-limit behavior (`app/api/auth/signup/__tests__/route.test.ts`).
+
+### Changed
+
+- Viewer access grant TTL extended from 5 minutes to 60 minutes; `/api/view/pdf` refreshes the grant on each access so active reading sessions are not interrupted.
+- `docker-compose.prod.yml` now mounts a named `pdf_cache` volume at `/app/.cache/pdf` so the PDF proxy cache is shared across container restarts.
+- Remaining `console.error` calls in mutation routes migrated to structured Pino logs.
 
 ### Changed
 

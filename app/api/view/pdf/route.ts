@@ -43,6 +43,16 @@ async function handler(req: NextRequest) {
       return NextResponse.json({ error: "Link expired" }, { status: 410 });
     }
 
+    // Refresh the grant while the viewer is actively loading the PDF so that
+    // legitimate long reading sessions are not interrupted.
+    const refreshedExpiresAt = new Date(
+      Date.now() + CLIENT_CACHE_MAX_AGE_SECONDS * 1000 + 60 * 60 * 1000,
+    );
+    await prisma.viewerGrant.update({
+      where: { id: grant.id },
+      data: { expiresAt: refreshedExpiresAt },
+    });
+
     if (download && !link.allowDownload) {
       return NextResponse.json(
         { error: "Download not allowed" },

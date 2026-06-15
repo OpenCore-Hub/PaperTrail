@@ -63,7 +63,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - pdf_cache:/app/.cache/pdf
 
 volumes:
   postgres_data:
   redis_data:
+  pdf_cache:

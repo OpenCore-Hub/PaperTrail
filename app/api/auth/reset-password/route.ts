@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { createLogger } from "@/lib/logger";
+import { enforceRateLimit, RateLimits } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const log = createLogger("api:auth:reset-password");
@@ -14,6 +15,15 @@ const resetSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const rateLimit = await enforceRateLimit(
+    req,
+    "auth:reset-password",
+    RateLimits.auth,
+  );
+  if (!rateLimit.allowed) {
+    return rateLimit.response!;
+  }
+
   try {
     const body = await req.json();
     const parsed = resetSchema.parse(body);
@@ -34,7 +44,10 @@ export async function POST(req: NextRequest) {
     await prisma.$transaction([
       prisma.user.update({
         where: { email: resetToken.email },
-        data: { password: passwordHash },
+        data: {
+          password: passwordHash,
+          sessionVersion: { increment: 1 },
+        },
       }),
       prisma.passwordResetToken.delete({
         where: { id: resetToken.id },

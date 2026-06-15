@@ -44,11 +44,12 @@ model User {
   id            String    @id @default(uuid())
   email         String    @unique
   name          String?
-  password      String?
-  role          UserRole  @default(EDITOR)
-  workspaceId   String    @map("workspace_id")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  password        String?
+  role            UserRole  @default(EDITOR)
+  sessionVersion  Int       @default(0) @map("session_version")
+  workspaceId     String    @map("workspace_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   documents     Document[]

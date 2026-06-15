@@ -3,6 +3,7 @@ import { customAlphabet } from "nanoid";
 import { prisma } from "@/lib/prisma";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { createLogger } from "@/lib/logger";
+import { enforceRateLimit, RateLimits } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const log = createLogger("api:auth:forgot-password");
@@ -17,6 +18,15 @@ const forgotSchema = z.object({
 const RESET_TTL_MS = 60 * 60 * 1000;
 
 export async function POST(req: NextRequest) {
+  const rateLimit = await enforceRateLimit(
+    req,
+    "auth:forgot-password",
+    RateLimits.auth,
+  );
+  if (!rateLimit.allowed) {
+    return rateLimit.response!;
+  }
+
   try {
     const body = await req.json();
     const parsed = forgotSchema.parse(body);

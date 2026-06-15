@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { createLogger } from "@/lib/logger";
+import { enforceRateLimit, RateLimits } from "@/lib/rate-limit";
+import { verifyDomainDns } from "@/lib/workspace-domain";
 import { z } from "zod";
-import { promises as dns } from "dns";
+
+const log = createLogger("api:team:domain");
 
 export const dynamic = "force-dynamic";
 
@@ -26,66 +30,6 @@ function normalizeDomain(domain: string): string {
   return d.replace(/^www\./, "");
 }
 
-async function verifyDomainDns(domain: string): Promise<{
-  ok: boolean;
-  records: string[];
-  instructions: string;
-}> {
-  const target = process.env.CUSTOM_DOMAIN_CNAME_TARGET;
-  const records: string[] = [];
-
-  try {
-    // Try CNAME first
-    const cnameRecords = await dns.resolveCname(domain);
-    records.push(...cnameRecords);
-  } catch {
-    // no CNAME
-  }
-
-  if (records.length === 0) {
-    try {
-      const aRecords = await dns.resolve4(domain);
-      records.push(...aRecords);
-    } catch {
-      // no A record
-    }
-    try {
-      const aaaaRecords = await dns.resolve6(domain);
-      records.push(...aaaaRecords);
-    } catch {
-      // no AAAA record
-    }
-  }
-
-  let ok = records.length > 0;
-  let instructions = target
-    ? `Add a CNAME record for ${domain} pointing to ${target}, or an A record pointing to your server IP.`
-    : `Add a CNAME or A record for ${domain} so it resolves to this application.`;
-
-  if (ok && target && records.length > 0) {
-    // CNAME target may be a hostname; A records won't match a hostname target.
-    const cnameMatch = records.some(
-      (r) => r.toLowerCase() === target.toLowerCase(),
-    );
-    if (!cnameMatch) {
-      // If target looks like an IP, allow A/AAAA match.
-      const ipMatch =
-        /^\d+\.\d+\.\d+\.\d+$/.test(target) &&
-        records.some((r) => r === target);
-      ok = ipMatch;
-    }
-    instructions = `Expected DNS record: ${target}. Current records: ${records.join(
-      ", ",
-    )}.`;
-  }
-
-  if (!ok) {
-    instructions += ` We could not resolve any DNS records for ${domain}.`;
-  }
-
-  return { ok, records, instructions };
-}
-
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.workspaceId || session.user.role !== "ADMIN") {
@@ -102,10 +46,7 @@ export async function GET() {
   });
 
   if (!workspace) {
-    return NextResponse.json(
-      { error: "Workspace not found" },
-      { status: 404 },
-    );
+    return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
   }
 
   return NextResponse.json({
@@ -123,6 +64,16 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session?.user?.workspaceId || session.user.role !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const rateLimit = await enforceRateLimit(
+      req,
+      "team:domain:update",
+      RateLimits.documentMutation,
+      session.user.id,
+    );
+    if (!rateLimit.allowed) {
+      return rateLimit.response!;
     }
 
     const body = await req.json();
@@ -184,7 +135,7 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    console.error("Domain update error:", error);
+    log.error({ error }, "team.domain_update_failed");
     return NextResponse.json(
       { error: "Failed to update domain" },
       { status: 500 },

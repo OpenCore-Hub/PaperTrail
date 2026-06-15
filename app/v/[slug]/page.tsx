@@ -2,7 +2,13 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { ViewerGate } from "@/components/viewer-gate";
-import { resolveWorkspaceByHostname } from "@/lib/workspace-domain";
+import {
+  resolveWorkspaceByHostname,
+  verifyDomainDns,
+} from "@/lib/workspace-domain";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("viewer:custom-domain");
 
 interface ViewerPageProps {
   params: { slug: string };
@@ -11,6 +17,20 @@ interface ViewerPageProps {
 export default async function ViewerPage({ params }: ViewerPageProps) {
   const host = headers().get("host") ?? "";
   const workspace = await resolveWorkspaceByHostname(host);
+
+  // Custom domains must still pass DNS re-verification on every access. If the
+  // DNS no longer points to this application, treat it as not found so the
+  // owner cannot be impersonated after losing control of the domain.
+  if (workspace?.customDomain) {
+    const dnsCheck = await verifyDomainDns(workspace.customDomain);
+    if (!dnsCheck.ok) {
+      log.warn(
+        { domain: workspace.customDomain, host },
+        "custom_domain.dns_reverification_failed",
+      );
+      notFound();
+    }
+  }
 
   const link = await prisma.shareLink.findUnique({
     where: { slug: params.slug },

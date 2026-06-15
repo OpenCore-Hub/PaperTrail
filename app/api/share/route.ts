@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateShareSlug } from "@/lib/slug";
+import { enforceRateLimit, RateLimits } from "@/lib/rate-limit";
 import { canManageDocuments, type UserRole } from "@/lib/roles";
 import { z } from "zod";
 
@@ -25,6 +26,16 @@ export async function POST(req: NextRequest) {
       !canManageDocuments(session.user.role as UserRole)
     ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const rateLimit = await enforceRateLimit(
+      req,
+      "share:create",
+      RateLimits.shareMutation,
+      session.user.id,
+    );
+    if (!rateLimit.allowed) {
+      return rateLimit.response!;
     }
 
     const body = await req.json();

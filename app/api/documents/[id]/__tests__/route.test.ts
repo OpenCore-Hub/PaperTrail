@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { DELETE } from "../route";
+import { resetRateLimits } from "@/lib/rate-limit";
 
 const {
   getServerSessionMock,
@@ -55,6 +56,7 @@ function mockSession(role: "ADMIN" | "EDITOR" | "VIEWER" = "ADMIN") {
 describe("DELETE /api/documents/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetRateLimits();
   });
 
   it("rejects unauthenticated users", async () => {
@@ -101,5 +103,27 @@ describe("DELETE /api/documents/[id]", () => {
     const res = await DELETE(makeRequest(), { params: { id: "doc-1" } });
     expect(res.status).toBe(200);
     expect(documentDeleteMock).toHaveBeenCalledWith({ where: { id: "doc-1" } });
+  });
+
+  it("returns 429 after exceeding the delete rate limit", async () => {
+    mockSession();
+    documentFindFirstMock.mockResolvedValue({
+      id: "doc-1",
+      storageKey: "file-key-123",
+    });
+    deleteFilesMock.mockResolvedValue({ success: true });
+
+    // The document mutation window allows 60 requests per user per hour.
+    for (let i = 0; i < 60; i++) {
+      const res = await DELETE(makeRequest(`doc-${i}`), {
+        params: { id: `doc-${i}` },
+      });
+      expect(res.status).toBe(200);
+    }
+
+    const blocked = await DELETE(makeRequest("doc-blocked"), {
+      params: { id: "doc-blocked" },
+    });
+    expect(blocked.status).toBe(429);
   });
 });

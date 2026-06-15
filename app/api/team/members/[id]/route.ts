@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { createLogger } from "@/lib/logger";
+import { enforceRateLimit, RateLimits } from "@/lib/rate-limit";
 import { UserRole } from "@/lib/roles";
 import { z } from "zod";
+
+const log = createLogger("api:team:members");
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +23,16 @@ export async function PATCH(
     const session = await getServerSession(authOptions);
     if (!session?.user?.workspaceId || session.user.role !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const rateLimit = await enforceRateLimit(
+      req,
+      "team:member:update",
+      RateLimits.documentMutation,
+      session.user.id,
+    );
+    if (!rateLimit.allowed) {
+      return rateLimit.response!;
     }
 
     const body = await req.json();
@@ -58,7 +72,7 @@ export async function PATCH(
         { status: 400 },
       );
     }
-    console.error("Member update error:", error);
+    log.error({ error }, "team.member_update_failed");
     return NextResponse.json(
       { error: "Failed to update member" },
       { status: 500 },
@@ -74,6 +88,16 @@ export async function DELETE(
     const session = await getServerSession(authOptions);
     if (!session?.user?.workspaceId || session.user.role !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const rateLimit = await enforceRateLimit(
+      req,
+      "team:member:delete",
+      RateLimits.documentMutation,
+      session.user.id,
+    );
+    if (!rateLimit.allowed) {
+      return rateLimit.response!;
     }
 
     const target = await prisma.user.findFirst({
@@ -107,7 +131,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Member delete error:", error);
+    log.error({ error }, "team.member_delete_failed");
     return NextResponse.json(
       { error: "Failed to remove member" },
       { status: 500 },

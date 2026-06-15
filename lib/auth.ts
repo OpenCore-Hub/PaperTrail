@@ -1,4 +1,4 @@
-import { NextAuthOptions } from "next-auth";
+import { NextAuthOptions, type Session } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { prisma } from "./prisma";
@@ -37,6 +37,7 @@ export const authOptions: NextAuthOptions = {
           name: user.name,
           workspaceId: user.workspaceId,
           role: user.role,
+          sessionVersion: user.sessionVersion,
         };
       },
     }),
@@ -80,10 +81,12 @@ export const authOptions: NextAuthOptions = {
           user.id = created.id;
           user.workspaceId = created.workspaceId;
           user.role = created.role;
+          user.sessionVersion = created.sessionVersion;
         } else {
           user.id = existing.id;
           user.workspaceId = existing.workspaceId;
           user.role = existing.role;
+          user.sessionVersion = existing.sessionVersion;
         }
       }
       return true;
@@ -93,14 +96,37 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.workspaceId = user.workspaceId;
         token.role = user.role;
+        token.sessionVersion = user.sessionVersion;
       }
       return token;
     },
     async session({ session, token }) {
-      if (token) {
+      if (token?.id) {
+        // Validate that the user's session_version has not changed since the
+        // JWT was issued. This invalidates all existing sessions on password
+        // reset or future forced logout.
+        const current = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { sessionVersion: true },
+        });
+
+        if (!current || current.sessionVersion !== token.sessionVersion) {
+          // Return a session with empty ids so existing auth checks reject it.
+          return {
+            ...session,
+            user: {
+              ...session.user,
+              id: "",
+              workspaceId: "",
+              sessionVersion: -1,
+            },
+          } as Session;
+        }
+
         session.user.id = token.id as string;
         session.user.workspaceId = token.workspaceId as string;
         session.user.role = token.role as UserRole;
+        session.user.sessionVersion = token.sessionVersion as number;
       }
       return session;
     },

@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { generateWorkspaceSlug } from "@/lib/slug";
+import { enforceRateLimit, RateLimits } from "@/lib/rate-limit";
+import { createLogger } from "@/lib/logger";
 import { z } from "zod";
+
+const log = createLogger("api:auth:signup");
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +18,11 @@ const signupSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const rateLimit = await enforceRateLimit(req, "auth:signup", RateLimits.auth);
+  if (!rateLimit.allowed) {
+    return rateLimit.response!;
+  }
+
   try {
     const body = await req.json();
     const parsed = signupSchema.parse(body);
@@ -56,7 +65,7 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    console.error("Signup error:", error);
+    log.error({ error }, "auth.signup_failed");
     return NextResponse.json(
       { error: "Failed to create account" },
       { status: 500 },

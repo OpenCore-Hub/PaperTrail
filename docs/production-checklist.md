@@ -139,6 +139,12 @@ curl https://your-domain.com/api/health
 - [ ] 使用 HTTPS（Let's Encrypt / 云证书）。
 - [ ] 定期检查 `npm audit` 和依赖更新。
 
+### 7.1 已内置的安全机制
+
+- **限流**：认证端点（signup / forgot-password / reset-password）按 IP 限流（10/小时）；团队/文档/分享变更端点按用户限流。生产环境建议配置 `REDIS_URL` 使限流窗口跨实例共享。
+- **会话失效**：重置密码会自动递增 `users.session_version`，使该用户所有现有 JWT 会话失效。
+- **自定义域名重新验证**：访问自定义域名下的分享链接时会实时校验 DNS；cron cleanup 也会定期清理 DNS 失效的域名。
+
 ## 8. Prometheus 指标
 
 应用内置 `/api/metrics` 端点，暴露 Prometheus 格式的指标：

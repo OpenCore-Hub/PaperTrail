@@ -1,4 +1,6 @@
 import Redis from "ioredis";
+import { NextRequest, NextResponse } from "next/server";
+import { getClientIp } from "./ip";
 
 export interface RateLimitWindow {
   maxRequests: number;
@@ -111,3 +113,57 @@ export async function isAllowed(
 export function resetRateLimits(): void {
   buckets.clear();
 }
+
+interface RateLimitResult {
+  allowed: boolean;
+  response: NextResponse | null;
+}
+
+/**
+ * Build a rate-limit key from a request. Uses the authenticated user id when
+ * available, otherwise falls back to the client IP.
+ */
+export function getRateLimitKey(
+  req: NextRequest,
+  prefix: string,
+  sessionUserId?: string,
+): string {
+  const source = sessionUserId || getClientIp(req) || "unknown";
+  return `${prefix}:${source}`;
+}
+
+/**
+ * Enforce a rate limit and return a standard 429 response when exceeded.
+ */
+export async function enforceRateLimit(
+  req: NextRequest,
+  prefix: string,
+  window: RateLimitWindow,
+  sessionUserId?: string,
+): Promise<RateLimitResult> {
+  const key = getRateLimitKey(req, prefix, sessionUserId);
+  const allowed = await isAllowed(key, window);
+  if (!allowed) {
+    return {
+      allowed: false,
+      response: NextResponse.json(
+        { error: "Rate limit exceeded. Please try again later." },
+        { status: 429 },
+      ),
+    };
+  }
+  return { allowed: true, response: null };
+}
+
+/**
+ * Common rate-limit windows used across the application.
+ */
+export const RateLimits = {
+  auth: { maxRequests: 10, windowMs: 60 * 60 * 1000 }, // 10 per hour per IP
+  passwordVerify: { maxRequests: 10, windowMs: 15 * 60 * 1000 }, // existing viewer verify limit
+  invite: { maxRequests: 30, windowMs: 60 * 60 * 1000 }, // 30 invites per admin per hour
+  shareMutation: { maxRequests: 120, windowMs: 60 * 60 * 1000 }, // 120 mutations per user per hour
+  documentMutation: { maxRequests: 60, windowMs: 60 * 60 * 1000 },
+  viewerEvent: { maxRequests: 60, windowMs: 60 * 1000 }, // existing
+  viewerStart: { maxRequests: 20, windowMs: 60 * 1000 }, // existing
+} as const;

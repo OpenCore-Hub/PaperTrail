@@ -65,6 +65,16 @@ describe("POST /api/auth/reset-password", () => {
     );
     expect(res.status).toBe(200);
     expect(transactionMock).toHaveBeenCalled();
+
+    // Verify the password reset also invalidates existing sessions.
+    const userUpdateCall = userUpdateMock.mock.calls[0][0];
+    expect(userUpdateCall).toMatchObject({
+      where: { email: "user@example.com" },
+      data: {
+        password: expect.any(String),
+        sessionVersion: { increment: 1 },
+      },
+    });
   });
 
   it("returns 400 for short passwords", async () => {

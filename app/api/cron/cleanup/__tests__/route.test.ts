@@ -6,11 +6,15 @@ const {
   shareLinkDeleteManyMock,
   viewSessionUpdateManyMock,
   viewSessionDeleteManyMock,
+  workspaceFindManyMock,
+  workspaceUpdateMock,
   pdfCacheCleanupMock,
 } = vi.hoisted(() => ({
   shareLinkDeleteManyMock: vi.fn(),
   viewSessionUpdateManyMock: vi.fn(),
   viewSessionDeleteManyMock: vi.fn(),
+  workspaceFindManyMock: vi.fn(),
+  workspaceUpdateMock: vi.fn(),
   pdfCacheCleanupMock: vi.fn(),
 }));
 
@@ -23,7 +27,19 @@ vi.mock("@/lib/prisma", () => ({
       updateMany: viewSessionUpdateManyMock,
       deleteMany: viewSessionDeleteManyMock,
     },
+    workspace: {
+      findMany: workspaceFindManyMock,
+      update: workspaceUpdateMock,
+    },
   },
+}));
+
+vi.mock("@/lib/workspace-domain", () => ({
+  verifyDomainDns: vi.fn(async (domain: string) => ({
+    ok: domain === "verified.example.com",
+    records: [],
+    instructions: "mock",
+  })),
 }));
 
 vi.mock("@/lib/pdf-cache", () => ({
@@ -68,6 +84,11 @@ describe("GET /api/cron/cleanup", () => {
     shareLinkDeleteManyMock.mockResolvedValue({ count: 5 });
     viewSessionUpdateManyMock.mockResolvedValue({ count: 3 });
     viewSessionDeleteManyMock.mockResolvedValue({ count: 12 });
+    workspaceFindManyMock.mockResolvedValue([
+      { id: "ws-1", customDomain: "verified.example.com" },
+      { id: "ws-2", customDomain: "expired.example.com" },
+    ]);
+    workspaceUpdateMock.mockResolvedValue({});
     pdfCacheCleanupMock.mockResolvedValue({ deleted: 2 });
 
     const res = await GET(makeRequest("Bearer secret"));
@@ -78,6 +99,11 @@ describe("GET /api/cron/cleanup", () => {
     expect(json.closedStaleSessions).toBe(3);
     expect(json.deletedOldSessions).toBe(12);
     expect(json.deletedPdfCacheEntries).toBe(2);
+    expect(json.clearedDomains).toBe(1);
+    expect(workspaceUpdateMock).toHaveBeenCalledWith({
+      where: { id: "ws-2" },
+      data: { customDomainVerifiedAt: null },
+    });
 
     expect(shareLinkDeleteManyMock).toHaveBeenCalledWith({
       where: {

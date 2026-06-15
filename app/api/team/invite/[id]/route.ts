@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { createLogger } from "@/lib/logger";
 import { teamInviteCounter, withMetrics } from "@/lib/metrics";
+import { enforceRateLimit, RateLimits } from "@/lib/rate-limit";
+
+const log = createLogger("api:team:invite");
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +18,16 @@ async function handler(
     const session = await getServerSession(authOptions);
     if (!session?.user?.workspaceId || session.user.role !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const rateLimit = await enforceRateLimit(
+      req,
+      "team:invite:cancel",
+      RateLimits.invite,
+      session.user.id,
+    );
+    if (!rateLimit.allowed) {
+      return rateLimit.response!;
     }
 
     const invite = await prisma.workspaceInvite.findFirst({
@@ -33,7 +47,7 @@ async function handler(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Invite delete error:", error);
+    log.error({ error }, "team.invite_cancel_failed");
     return NextResponse.json(
       { error: "Failed to cancel invite" },
       { status: 500 },
