@@ -1,7 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { ComponentProps } from "react";
+import { forwardRef, type ComponentProps } from "react";
+import type { PdfViewerHandle } from "./pdf-viewer-content";
 
 const PdfViewerContent = dynamic(
   () =>
@@ -11,6 +12,9 @@ const PdfViewerContent = dynamic(
   { ssr: false },
 );
 
-export function PdfViewer(props: ComponentProps<typeof PdfViewerContent>) {
-  return <PdfViewerContent {...props} />;
-}
+export const PdfViewer = forwardRef<
+  PdfViewerHandle,
+  ComponentProps<typeof PdfViewerContent>
+>((props, ref) => <PdfViewerContent ref={ref} {...props} />);
+
+PdfViewer.displayName = "PdfViewer";

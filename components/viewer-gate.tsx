@@ -9,8 +9,11 @@ import { toast } from "sonner";
 import { Lock, FileText, AlertCircle } from "lucide-react";
 import FingerprintJS from "@fingerprintjs/fingerprintjs";
 import { PdfViewer } from "./pdf-viewer";
+import { ViewerAiPanel } from "./viewer-ai-panel";
+import type { PdfViewerHandle } from "./pdf-viewer-content";
 
 interface ViewerGateProps {
+  documentId: string;
   link: {
     id: string;
     slug: string;
@@ -22,7 +25,7 @@ interface ViewerGateProps {
   filename: string;
 }
 
-export function ViewerGate({ link, filename }: ViewerGateProps) {
+export function ViewerGate({ documentId, link, filename }: ViewerGateProps) {
   const [granted, setGranted] = useState(!link.passwordHash && !link.emailGate);
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
@@ -31,6 +34,7 @@ export function ViewerGate({ link, filename }: ViewerGateProps) {
   const [viewerSessionId, setViewerSessionId] = useState<string | null>(null);
   const [fingerprint, setFingerprint] = useState<string>("anonymous");
   const startedRef = useRef(false);
+  const pdfRef = useRef<PdfViewerHandle>(null);
 
   useEffect(() => {
     FingerprintJS.load()
@@ -283,12 +287,18 @@ export function ViewerGate({ link, filename }: ViewerGateProps) {
       </header>
       <main className="flex-1 overflow-auto">
         <PdfViewer
+          ref={pdfRef}
           pdfUrl={pdfUrl}
           sessionId={viewerSessionId}
           allowDownload={link.allowDownload}
           filename={filename}
         />
       </main>
+      <ViewerAiPanel
+        documentId={documentId}
+        viewerToken={viewerToken}
+        pdfRef={pdfRef}
+      />
     </div>
   );
 }

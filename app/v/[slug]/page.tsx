@@ -30,6 +30,7 @@ export default async function ViewerPage({ params }: ViewerPageProps) {
 
   return (
     <ViewerGate
+      documentId={link.document.id}
       link={{
         id: link.id,
         slug: link.slug,
