@@ -8,18 +8,19 @@ datasource db {
 }
 
 model Workspace {
-  id            String    @id @default(uuid())
+  id            String            @id @default(uuid())
   name          String
-  slug          String    @unique
-  customDomain           String?   @unique @map("custom_domain")
+  slug          String            @unique
+  customDomain           String?  @unique @map("custom_domain")
   customDomainVerifiedAt DateTime? @map("custom_domain_verified_at")
   plan                   String    @default("free")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
 
   users         User[]
   invites       WorkspaceInvite[]
   documents     Document[]
+  aiProviderConfig AiProviderConfig?
 
   @@map("workspaces")
 }
@@ -97,20 +98,21 @@ model Document {
 }
 
 model DocumentVersion {
-  id            String        @id @default(uuid())
-  documentId    String        @map("document_id")
-  versionNumber Int           @map("version_number")
-  storageKey    String        @map("storage_key")
-  storageType   StorageType   @default(UPLOADTHING) @map("storage_type")
-  fileSize      Int           @map("file_size")
-  pageCount     Int           @default(0) @map("page_count")
-  contentType   String        @map("content_type")
-  aiStatus      AiIndexStatus @default(PENDING) @map("ai_status")
-  createdBy     String        @map("created_by")
-  createdAt     DateTime      @default(now()) @map("created_at")
+  id            String          @id @default(uuid())
+  documentId    String          @map("document_id")
+  versionNumber Int             @map("version_number")
+  storageKey    String          @map("storage_key")
+  storageType   StorageType     @default(UPLOADTHING) @map("storage_type")
+  fileSize      Int             @map("file_size")
+  pageCount     Int             @default(0) @map("page_count")
+  contentType   String          @map("content_type")
+  aiStatus      AiIndexStatus   @default(PENDING) @map("ai_status")
+  createdBy     String          @map("created_by")
+  createdAt     DateTime        @default(now()) @map("created_at")
 
-  document      Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  creator       User          @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  document      Document        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  creator       User            @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  chunks        DocumentChunk[]
 
   @@unique([documentId, versionNumber])
   @@index([documentId, versionNumber])
@@ -128,6 +130,83 @@ enum AiIndexStatus {
   PROCESSING
   READY
   FAILED
+}
+
+model DocumentChunk {
+  id                String          @id @default(uuid())
+  documentVersionId String          @map("document_version_id")
+  content           String
+  embedding         Unsupported("vector(1536)")
+  pageNumber        Int             @map("page_number")
+  paragraphIndex    Int?            @map("paragraph_index")
+  metadata          Json?
+
+  documentVersion   DocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+
+  @@index([documentVersionId])
+  @@map("document_chunks")
+}
+
+enum AiProviderMode {
+  CLOUD
+  BYOK
+  LOCAL
+}
+
+model AiProviderConfig {
+  id          String         @id @default(uuid())
+  workspaceId String         @unique @map("workspace_id")
+  mode        AiProviderMode @default(CLOUD)
+  provider    String
+  model       String
+  apiKey      String?        @map("api_key")
+  baseUrl     String?        @map("base_url")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("ai_provider_configs")
+}
+
+enum AiScopeType {
+  DOCUMENT
+  DATAROOM
+  LINK
+}
+
+enum AiMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+model AiConversation {
+  id        String        @id @default(uuid())
+  scopeType AiScopeType
+  scopeId   String
+  title     String?
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+
+  messages  AiMessage[]
+
+  @@index([scopeType, scopeId])
+  @@map("ai_conversations")
+}
+
+model AiMessage {
+  id             String         @id @default(uuid())
+  conversationId String         @map("conversation_id")
+  role           AiMessageRole
+  content        String
+  citations      Json?
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@map("ai_messages")
 }
 
 model ShareLink {

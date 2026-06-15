@@ -6,6 +6,7 @@ import { createLogger } from "@/lib/logger";
 import { canManageDocuments, type UserRole } from "@/lib/roles";
 import { getStorageProvider } from "@/lib/storage/factory";
 import { audit } from "@/lib/audit";
+import { enqueueProcessDocumentForAi } from "@/lib/ai/jobs/queue";
 
 const log = createLogger("api:documents:versions");
 
@@ -136,6 +137,11 @@ export async function POST(
       actor: { userId: session.user.id, workspaceId: session.user.workspaceId },
       resource: { type: "document", id: params.id },
       metadata: { versionId: version.id, versionNumber: version.versionNumber },
+    });
+
+    await enqueueProcessDocumentForAi({
+      documentVersionId: version.id,
+      workspaceId: session.user.workspaceId,
     });
 
     return NextResponse.json({ version }, { status: 201 });

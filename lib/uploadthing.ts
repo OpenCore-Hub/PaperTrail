@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "./auth";
 import { prisma } from "./prisma";
 import { canManageDocuments, type UserRole } from "./roles";
+import { enqueueProcessDocumentForAi } from "./ai/jobs/queue";
 
 const f = createUploadthing();
 
@@ -52,8 +53,8 @@ export const ourFileRouter = {
         throw new Error("File exceeds 20MB app limit");
       }
 
-      await prisma.$transaction(async (tx) => {
-        const document = await tx.document.create({
+      const document = await prisma.$transaction(async (tx) => {
+        const doc = await tx.document.create({
           data: {
             workspaceId: metadata.workspaceId,
             uploadedBy: metadata.userId,
@@ -61,9 +62,9 @@ export const ourFileRouter = {
           },
         });
 
-        await tx.documentVersion.create({
+        const version = await tx.documentVersion.create({
           data: {
-            documentId: document.id,
+            documentId: doc.id,
             versionNumber: 1,
             storageKey: file.key,
             storageType: "UPLOADTHING",
@@ -72,6 +73,13 @@ export const ourFileRouter = {
             createdBy: metadata.userId,
           },
         });
+
+        return { document: doc, version };
+      });
+
+      await enqueueProcessDocumentForAi({
+        documentVersionId: document.version.id,
+        workspaceId: metadata.workspaceId,
       });
     }),
 } satisfies FileRouter;

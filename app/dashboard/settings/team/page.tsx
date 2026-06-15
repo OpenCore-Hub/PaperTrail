@@ -6,7 +6,7 @@ import { TeamManagement } from "@/components/team-management";
 import { CustomDomainManager } from "@/components/custom-domain-manager";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Sparkles } from "lucide-react";
 
 export default async function TeamSettingsPage() {
   const session = await getServerSession(authOptions);
@@ -29,6 +29,12 @@ export default async function TeamSettingsPage() {
             </Link>
           </Button>
           <h1 className="text-xl font-bold">Team settings</h1>
+          <Button variant="outline" size="sm" asChild className="ml-auto">
+            <Link href="/dashboard/settings/ai">
+              <Sparkles className="mr-1 h-4 w-4" />
+              AI Settings
+            </Link>
+          </Button>
         </div>
       </header>
 
