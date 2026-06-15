@@ -52,6 +52,12 @@ async function handler(req: NextRequest) {
     }
 
     const { document } = link;
+    if (!document) {
+      return NextResponse.json(
+        { error: "Document not found" },
+        { status: 404 },
+      );
+    }
     const version = await getLatestVersionOrThrow(document.id);
     const storageKey = version.storageKey;
 
