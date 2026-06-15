@@ -67,10 +67,17 @@ test("uploads a PDF and shows it in the document list", async ({ page }) => {
       filename: seedConstants.documentFilename,
     },
     orderBy: { createdAt: "desc" },
+    include: {
+      versions: {
+        orderBy: { versionNumber: "desc" },
+        take: 1,
+      },
+    },
   });
 
   expect(uploadedDocument).not.toBeNull();
-  if (uploadedDocument) {
-    appendUploadedStorageKey(uploadedDocument.storageKey);
+  const storageKey = uploadedDocument?.versions[0]?.storageKey;
+  if (storageKey) {
+    appendUploadedStorageKey(storageKey);
   }
 });

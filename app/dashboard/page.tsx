@@ -16,15 +16,24 @@ export default async function DashboardPage() {
     redirect("/auth/signin");
   }
 
-  const documents = await prisma.document.findMany({
+  const rawDocuments = await prisma.document.findMany({
     where: { workspaceId: session.user.workspaceId },
     orderBy: { createdAt: "desc" },
     include: {
       _count: {
         select: { links: true },
       },
+      versions: {
+        orderBy: { versionNumber: "desc" },
+        take: 1,
+      },
     },
   });
+
+  const documents = rawDocuments.map((document) => ({
+    ...document,
+    fileSize: document.versions[0]?.fileSize ?? 0,
+  }));
 
   return (
     <div className="min-h-screen bg-background">
