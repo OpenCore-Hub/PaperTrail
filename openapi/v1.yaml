@@ -1,0 +1,318 @@
+openapi: 3.0.3
+info:
+  title: DocHub Public API
+  description: |
+    Public API for DocHub. Provides programmatic access to documents,
+    sharing links, datarooms, and analytics.
+  version: 1.0.0
+  contact:
+    name: DocHub Support
+    url: https://github.com/OpenCore-Hub/PaperTrail/issues
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.dochub.example.com/api/v1
+    description: Production server
+  - url: http://localhost:3000/api/v1
+    description: Local development server
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /documents:
+    get:
+      summary: List documents
+      description: Returns a paginated list of documents in the workspace.
+      operationId: listDocuments
+      tags:
+        - Documents
+      responses:
+        "200":
+          description: A list of documents
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedDocuments"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      summary: Upload a document
+      description: Uploads a new document to the workspace.
+      operationId: uploadDocument
+      tags:
+        - Documents
+      responses:
+        "201":
+          description: Document created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /links:
+    get:
+      summary: List sharing links
+      description: Returns a paginated list of sharing links.
+      operationId: listLinks
+      tags:
+        - Links
+      responses:
+        "200":
+          description: A list of links
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedLinks"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      summary: Create a sharing link
+      description: Creates a new sharing link for a document or dataroom.
+      operationId: createLink
+      tags:
+        - Links
+      responses:
+        "201":
+          description: Link created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Link"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /datarooms:
+    get:
+      summary: List datarooms
+      description: Returns a paginated list of datarooms in the workspace.
+      operationId: listDatarooms
+      tags:
+        - Datarooms
+      responses:
+        "200":
+          description: A list of datarooms
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedDatarooms"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      summary: Create a dataroom
+      description: Creates a new dataroom.
+      operationId: createDataroom
+      tags:
+        - Datarooms
+      responses:
+        "201":
+          description: Dataroom created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dataroom"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /analytics:
+    get:
+      summary: Get analytics overview
+      description: Returns high-level analytics for the workspace.
+      operationId: getAnalyticsOverview
+      tags:
+        - Analytics
+      responses:
+        "200":
+          description: Analytics overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsOverview"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: |
+        API key passed in the `Authorization` header as `Bearer <key>`.
+        The key is created in the DocHub workspace settings and is only
+        shown once.
+
+  schemas:
+    Document:
+      type: object
+      properties:
+        id:
+          type: string
+          format: cuid
+        name:
+          type: string
+        url:
+          type: string
+          format: uri
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+
+    PaginatedDocuments:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Document"
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+      required:
+        - data
+        - total
+
+    Link:
+      type: object
+      properties:
+        id:
+          type: string
+          format: cuid
+        documentId:
+          type: string
+          nullable: true
+        dataroomId:
+          type: string
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+
+    PaginatedLinks:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Link"
+        total:
+          type: integer
+      required:
+        - data
+        - total
+
+    Dataroom:
+      type: object
+      properties:
+        id:
+          type: string
+          format: cuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+
+    PaginatedDatarooms:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Dataroom"
+        total:
+          type: integer
+      required:
+        - data
+        - total
+
+    AnalyticsOverview:
+      type: object
+      properties:
+        views:
+          type: integer
+        downloads:
+          type: integer
+        uniqueViewers:
+          type: integer
+        aiQueries:
+          type: integer
+      required:
+        - views
+        - downloads
+        - uniqueViewers
+        - aiQueries
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+      required:
+        - error
+
+  responses:
+    Unauthorized:
+      description: Unauthorized - missing or invalid API key
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: Unauthorized
+            message: Missing or invalid API key
+            code: UNAUTHORIZED
+
+    Forbidden:
+      description: Forbidden - valid API key but insufficient scope
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: Forbidden
+            message: API key does not have permission for this resource
+            code: FORBIDDEN
